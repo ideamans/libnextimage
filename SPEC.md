@@ -320,8 +320,9 @@ import (
 )
 
 func main() {
-    // 例1: JPEG → WebP 変換 - ファイル同士
-    err := libnextimage.ToWebPFile("input.jpg", "output.webp",
+    // 例1: エンコーダーインスタンスを再利用（推奨）
+    // 同じ設定で複数のファイルを変換する場合に効率的
+    encoder, err := libnextimage.NewWebPEncoder(
         libnextimage.WebPEncodeOptions{
             Quality: 80,
             Method: 4,
@@ -329,109 +330,383 @@ func main() {
     if err != nil {
         panic(err)
     }
+    defer encoder.Close()
 
-    // 例2: WebP デコード → PNG保存 - ファイル同士
-    err = libnextimage.WebPDecodeFile("input.webp", "output.png",
-        libnextimage.WebPDecodeOptions{})
+    // 複数のファイルを同じ設定でエンコード
+    for _, filename := range []string{"image1.jpg", "image2.png", "image3.jpg"} {
+        outfile := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".webp"
+        if err := encoder.EncodeFile(filename, outfile); err != nil {
+            log.Printf("Failed to encode %s: %v", filename, err)
+        }
+    }
+
+    // 例2: ワンショット変換（便利関数）
+    // 1つのファイルだけを変換する場合
+    err = libnextimage.ToWebPFile("single.jpg", "single.webp",
+        libnextimage.WebPEncodeOptions{Quality: 90})
     if err != nil {
         panic(err)
     }
 
-    // 例3: PNG → AVIF 変換 - ストリーム同士
-    inFile, _ := os.Open("input.png")
-    defer inFile.Close()
-
-    outFile, _ := os.Create("output.avif")
-    defer outFile.Close()
-
-    err = libnextimage.ToAVIFStream(inFile, outFile,
+    // 例3: AVIF エンコーダーで複数画像を処理
+    avifEnc, _ := libnextimage.NewAVIFEncoder(
         libnextimage.AVIFEncodeOptions{
-            Quality: 50,
+            Quality: 75,
             Speed: 6,
         })
-    if err != nil {
-        panic(err)
-    }
+    defer avifEnc.Close()
 
-    // 例4: JPEG → AVIF 変換 - バイト列同士
+    // バイト列での変換
     jpegData, _ := os.ReadFile("input.jpg")
-
-    avifBytes, err := libnextimage.ToAVIFBytes(jpegData,
-        libnextimage.AVIFEncodeOptions{Quality: 75})
-    if err != nil {
-        panic(err)
-    }
+    avifBytes, _ := avifEnc.EncodeBytes(jpegData)
     os.WriteFile("output.avif", avifBytes, 0644)
 
-    // 例5: WebP デコード - バイト列からピクセルデータへ
-    webpData, _ := os.ReadFile("input.webp")
+    // ストリームでの変換
+    inFile, _ := os.Open("input2.png")
+    outFile, _ := os.Create("output2.avif")
+    avifEnc.EncodeStream(inFile, outFile)
+    inFile.Close()
+    outFile.Close()
 
-    decoded, err := libnextimage.WebPDecodeBytes(webpData,
+    // 例4: デコーダーの再利用
+    decoder, _ := libnextimage.NewWebPDecoder(
         libnextimage.WebPDecodeOptions{})
-    if err != nil {
-        panic(err)
-    }
+    defer decoder.Close()
+
+    webpData, _ := os.ReadFile("input.webp")
+    decoded, _ := decoder.DecodeBytes(webpData)
     // decoded.Data (RGBAピクセルデータ), decoded.Width, decoded.Height を使用
     // 例: 画像処理やメモリ上での操作に利用
+
+    // 例5: GIF → WebP アニメーション変換
+    gif2webp, _ := libnextimage.NewGIF2WebPConverter(
+        libnextimage.WebPEncodeOptions{Quality: 80})
+    gif2webp.ConvertFile("animation.gif", "animation.webp")
 }
 ```
 
 ## API設計
 
-シンプルさと明確さを重視し、入出力の組み合わせを3つのパターンに限定:
-1. **バイト配列同士** (`*Bytes`): 画像ファイルのバイトデータを直接変換（JPEG→WebP、PNG→AVIFなど）
-2. **ファイル同士** (`*File`): ファイルパスを指定して変換
-3. **ストリーム同士** (`*Stream`): io.Reader/io.Writerで変換
+### 設計方針
 
-**重要**: `*Bytes`関数は画像ファイルフォーマット（JPEG、PNG、WebP、AVIFなど）のバイトデータを扱います。
-ピクセルデータ（RGBA配列など）を直接扱う場合は、C FFIレイヤーを使用してください。
+1. **エンコーダー/デコーダーのインスタンス化**
+   - 同じ設定で複数の画像を処理する場合、初期化オーバーヘッドを削減
+   - エンコーダー/デコーダーを事前にセットアップし、再利用可能
+   - インスタンスメソッドで変換を実行
 
-各フォーマットに対して以下の関数を提供:
+2. **入出力パターン**
+   - **バイト配列** (`*Bytes`): 画像ファイルのバイトデータを直接変換
+   - **ファイル** (`*File`): ファイルパスを指定して変換
+   - **ストリーム** (`*Stream`): io.Reader/io.Writerで変換
 
-### 画像フォーマット変換
+3. **重要な注意点**
+   - `*Bytes`関数は画像ファイルフォーマット（JPEG、PNG、WebP、AVIFなど）のバイトデータを扱います
+   - ピクセルデータ（RGBA配列など）を直接扱う場合は、C FFIレイヤーを使用してください
+
+### WebP エンコーダー/デコーダー
 
 ```go
-// JPEG/PNG/その他 → WebP
+// WebPエンコーダー - 設定を保持して再利用可能
+type WebPEncoder struct {
+    // 内部実装（libwebpのエンコーダー状態を保持）
+}
+
+// エンコーダーの作成
+func NewWebPEncoder(opts WebPEncodeOptions) (*WebPEncoder, error)
+
+// エンコーダーメソッド
+func (e *WebPEncoder) EncodeBytes(imageData []byte) ([]byte, error)
+func (e *WebPEncoder) EncodeFile(inputPath string, outputPath string) error
+func (e *WebPEncoder) EncodeStream(input io.Reader, output io.Writer) error
+
+// リソース解放（必要に応じて）
+func (e *WebPEncoder) Close() error
+
+// WebPデコーダー - 設定を保持して再利用可能
+type WebPDecoder struct {
+    // 内部実装（libwebpのデコーダー状態を保持）
+}
+
+// デコーダーの作成
+func NewWebPDecoder(opts WebPDecodeOptions) (*WebPDecoder, error)
+
+// デコーダーメソッド
+func (d *WebPDecoder) DecodeBytes(webpData []byte) (*DecodedImage, error)
+func (d *WebPDecoder) DecodeFile(inputPath string, outputPath string) error
+func (d *WebPDecoder) DecodeStream(input io.Reader, output io.Writer) error
+
+// リソース解放（必要に応じて）
+func (d *WebPDecoder) Close() error
+```
+
+### AVIF エンコーダー/デコーダー
+
+```go
+// AVIFエンコーダー - 設定を保持して再利用可能
+type AVIFEncoder struct {
+    // 内部実装（libavifのエンコーダー状態を保持）
+}
+
+// エンコーダーの作成
+func NewAVIFEncoder(opts AVIFEncodeOptions) (*AVIFEncoder, error)
+
+// エンコーダーメソッド
+func (e *AVIFEncoder) EncodeBytes(imageData []byte) ([]byte, error)
+func (e *AVIFEncoder) EncodeFile(inputPath string, outputPath string) error
+func (e *AVIFEncoder) EncodeStream(input io.Reader, output io.Writer) error
+
+// リソース解放（必要に応じて）
+func (e *AVIFEncoder) Close() error
+
+// AVIFデコーダー - 設定を保持して再利用可能
+type AVIFDecoder struct {
+    // 内部実装（libavifのデコーダー状態を保持）
+}
+
+// デコーダーの作成
+func NewAVIFDecoder(opts AVIFDecodeOptions) (*AVIFDecoder, error)
+
+// デコーダーメソッド
+func (d *AVIFDecoder) DecodeBytes(avifData []byte) (*DecodedImage, error)
+func (d *AVIFDecoder) DecodeFile(inputPath string, outputPath string) error
+func (d *AVIFDecoder) DecodeStream(input io.Reader, output io.Writer) error
+
+// リソース解放（必要に応じて）
+func (d *AVIFDecoder) Close() error
+```
+
+### アニメーション変換（GIF ⇔ WebP）
+
+```go
+// GIF → WebP変換器
+type GIF2WebPConverter struct{}
+
+func NewGIF2WebPConverter(opts WebPEncodeOptions) (*GIF2WebPConverter, error)
+func (c *GIF2WebPConverter) ConvertBytes(gifData []byte) ([]byte, error)
+func (c *GIF2WebPConverter) ConvertFile(inputPath string, outputPath string) error
+
+// WebP → GIF変換器
+type WebP2GIFConverter struct{}
+
+func NewWebP2GIFConverter() (*WebP2GIFConverter, error)
+func (c *WebP2GIFConverter) ConvertBytes(webpData []byte) ([]byte, error)
+func (c *WebP2GIFConverter) ConvertFile(inputPath string, outputPath string) error
+```
+
+### 便利関数（ワンショット変換用）
+
+エンコーダーインスタンスを毎回作成するのが面倒な場合のヘルパー関数:
+
+```go
+// WebP変換（内部でエンコーダーを作成・破棄）
 func ToWebPBytes(imageData []byte, opts WebPEncodeOptions) ([]byte, error)
 func ToWebPFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
-func ToWebPStream(input io.Reader, output io.Writer, opts WebPEncodeOptions) error
 
-// JPEG/PNG/その他 → AVIF
+// AVIF変換（内部でエンコーダーを作成・破棄）
 func ToAVIFBytes(imageData []byte, opts AVIFEncodeOptions) ([]byte, error)
 func ToAVIFFile(inputPath string, outputPath string, opts AVIFEncodeOptions) error
-func ToAVIFStream(input io.Reader, output io.Writer, opts AVIFEncodeOptions) error
 
-// WebP → JPEG/PNG/その他（デコード）
-func WebPDecodeBytes(webpData []byte, opts WebPDecodeOptions) (*DecodedImage, error)
-func WebPDecodeFile(inputPath string, outputPath string, opts WebPDecodeOptions) error
-func WebPDecodeStream(input io.Reader, output io.Writer, opts WebPDecodeOptions) error
-
-// AVIF → JPEG/PNG/その他（デコード）
-func AVIFDecodeBytes(avifData []byte, opts AVIFDecodeOptions) (*DecodedImage, error)
-func AVIFDecodeFile(inputPath string, outputPath string, opts AVIFDecodeOptions) error
-func AVIFDecodeStream(input io.Reader, output io.Writer, opts AVIFDecodeOptions) error
-
-// GIF → WebP（アニメーション対応）
+// GIF → WebP
 func GIF2WebPBytes(gifData []byte, opts WebPEncodeOptions) ([]byte, error)
 func GIF2WebPFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
 
-// WebP → GIF（アニメーション対応）
+// WebP → GIF
 func WebP2GIFBytes(webpData []byte) ([]byte, error)
 func WebP2GIFFile(inputPath string, outputPath string) error
-
-// フォーマット間の直接変換
-func WebPToAVIFBytes(webpData []byte, opts AVIFEncodeOptions) ([]byte, error)
-func AVIFToWebPBytes(avifData []byte, opts WebPEncodeOptions) ([]byte, error)
 ```
 
 ### API設計の原則
 
-1. **入出力の一貫性**: 入力と出力の型を統一（Bytes同士、File同士、Stream同士）
-2. **関数名の明確さ**: 関数名で入出力フォーマットと型が分かる
-3. **画像フォーマットの抽象化**: JPEG/PNGなどは自動判定、明示的な指定は不要
-4. **エラーハンドリング**: すべての関数がerrorを返す
-5. **オプション構造体**: 各フォーマット固有のオプションを型安全に扱う
-6. **デコード結果**: `DecodedImage`構造体でピクセルデータとメタデータを返す
+1. **エンコーダー再利用**: 同じ設定で複数ファイルを処理する際の初期化オーバーヘッド削減
+2. **入出力の一貫性**: 各メソッドは入力と出力の型を統一（Bytes、File、Stream）
+3. **関数名の明確さ**: 関数/メソッド名で入出力フォーマットと型が分かる
+4. **画像フォーマットの自動判定**: JPEG/PNGなどは内部で自動判定
+5. **エラーハンドリング**: すべての関数/メソッドがerrorを返す
+6. **リソース管理**: Close()でC側のリソースを適切に解放
+7. **便利関数の提供**: ワンショット変換用のヘルパー関数も提供
+
+### メモリ管理とリソース解放
+
+#### C言語FFIレイヤー
+
+エンコーダー/デコーダーのインスタンスは、libwebpやlibavifの内部状態を保持します。
+これらのインスタンスは明示的に解放する必要があります。
+
+**C言語でのインスタンス管理:**
+
+```c
+// webp.h
+typedef struct NextImageWebPEncoder NextImageWebPEncoder;
+
+// エンコーダーの作成（libwebpの初期化を含む）
+NextImageWebPEncoder* nextimage_webp_encoder_create(
+    const NextImageWebPEncodeOptions* options);
+
+// エンコーダーでエンコード（繰り返し呼び出し可能）
+NextImageStatus nextimage_webp_encoder_encode(
+    NextImageWebPEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output);
+
+// エンコーダーの破棄（内部メモリの解放）
+void nextimage_webp_encoder_destroy(NextImageWebPEncoder* encoder);
+
+// avif.h
+typedef struct NextImageAVIFEncoder NextImageAVIFEncoder;
+
+NextImageAVIFEncoder* nextimage_avif_encoder_create(
+    const NextImageAVIFEncodeOptions* options);
+
+NextImageStatus nextimage_avif_encoder_encode(
+    NextImageAVIFEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output);
+
+void nextimage_avif_encoder_destroy(NextImageAVIFEncoder* encoder);
+```
+
+**実装での注意点:**
+
+1. `*_create()` 関数は内部で以下を行う:
+   - `nextimage_malloc()` でインスタンス構造体を確保
+   - libwebp/libavifのエンコーダー/デコーダーを初期化
+   - オプションを設定
+
+2. `*_encode()` / `*_decode()` 関数は:
+   - 既存のインスタンスを再利用
+   - 出力バッファのみを新規割り当て（`nextimage_malloc()`）
+   - 出力バッファは呼び出し側が`nextimage_free_buffer()`で解放
+
+3. `*_destroy()` 関数は内部で以下を行う:
+   - libwebp/libavifのクリーンアップ関数を呼び出し
+   - インスタンス構造体を`nextimage_free()`で解放
+
+#### Go言語バインディングレイヤー
+
+Go言語では、C言語で確保したメモリを確実に解放するため、以下の2段階の仕組みを実装します:
+
+**1. 明示的なClose()メソッド**
+
+エンコーダー/デコーダーインスタンスは`Close()`メソッドで明示的に解放できます:
+
+```go
+encoder, err := libnextimage.NewWebPEncoder(opts)
+if err != nil {
+    return err
+}
+defer encoder.Close()  // 必ず呼び出す
+
+// エンコード処理...
+```
+
+**2. ファイナライザーによる自動解放**
+
+`Close()`の呼び忘れに備え、`runtime.SetFinalizer()`でガベージコレクション時に自動解放します:
+
+```go
+func NewWebPEncoder(opts WebPEncodeOptions) (*WebPEncoder, error) {
+    copts := opts.toCEncodeOptions()
+    cEncoder := C.nextimage_webp_encoder_create(&copts)
+    if cEncoder == nil {
+        return nil, fmt.Errorf("webp: failed to create encoder")
+    }
+
+    encoder := &WebPEncoder{
+        cEncoder: cEncoder,
+        closed:   false,
+    }
+
+    // ファイナライザーを設定（Close()が呼ばれなかった場合の保険）
+    runtime.SetFinalizer(encoder, func(e *WebPEncoder) {
+        e.Close()
+    })
+
+    return encoder, nil
+}
+
+func (e *WebPEncoder) Close() error {
+    e.mu.Lock()
+    defer e.mu.Unlock()
+
+    if e.closed {
+        return nil  // 二重解放を防止
+    }
+
+    if e.cEncoder != nil {
+        C.nextimage_webp_encoder_destroy(e.cEncoder)
+        e.cEncoder = nil
+    }
+
+    e.closed = true
+
+    // ファイナライザーを解除（明示的にClose()されたため不要）
+    runtime.SetFinalizer(e, nil)
+
+    return nil
+}
+```
+
+**構造体定義:**
+
+```go
+type WebPEncoder struct {
+    cEncoder *C.NextImageWebPEncoder
+    mu       sync.Mutex
+    closed   bool
+}
+
+type AVIFEncoder struct {
+    cEncoder *C.NextImageAVIFEncoder
+    mu       sync.Mutex
+    closed   bool
+}
+```
+
+**メモリリークテストでの検証:**
+
+```go
+func TestWebPEncoder_NoMemoryLeak(t *testing.T) {
+    // 初期カウンター
+    clearError()
+    initial := int64(C.nextimage_allocation_counter())
+
+    // 1000回エンコーダーを生成・破棄
+    for i := 0; i < 1000; i++ {
+        encoder, err := NewWebPEncoder(DefaultWebPEncodeOptions())
+        if err != nil {
+            t.Fatal(err)
+        }
+
+        // たまにClose()を忘れる（ファイナライザーのテスト）
+        if i%10 != 0 {
+            encoder.Close()
+        }
+    }
+
+    // GCを強制実行（ファイナライザーが動く）
+    runtime.GC()
+    runtime.GC()
+    time.Sleep(100 * time.Millisecond)
+
+    // 最終カウンター（リークがなければ0に戻る）
+    final := int64(C.nextimage_allocation_counter())
+    leaked := final - initial
+
+    if leaked != 0 {
+        t.Errorf("Memory leak detected: %d allocations not freed", leaked)
+    }
+}
+```
+
+**ベストプラクティス:**
+
+1. **必ずdefer encoder.Close()を使用** - 最も確実な方法
+2. **ファイナライザーは保険** - Close()忘れのフェイルセーフ
+3. **二重解放の防止** - closedフラグで防止
+4. **並行アクセスの保護** - sync.Mutexで保護
+5. **出力バッファの自動解放** - EncodeBytes()などは内部で`freeEncodeBuffer()`を呼び出し
 
 ### 共通型定義
 
