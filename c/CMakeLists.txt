@@ -129,6 +129,22 @@ endif()
 
 add_test(NAME BasicTest COMMAND basic_test)
 
+# WebPテスト
+add_executable(webp_test test/webp_test.c)
+target_link_libraries(webp_test nextimage)
+
+if(ENABLE_ASAN)
+    target_compile_options(webp_test PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(webp_test PRIVATE -fsanitize=address)
+endif()
+
+if(ENABLE_UBSAN)
+    target_compile_options(webp_test PRIVATE -fsanitize=undefined)
+    target_link_options(webp_test PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME WebPTest COMMAND webp_test)
+
 # デバッグビルドのみ: リークカウンターテスト
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_executable(leak_counter_test test/leak_counter_test.c)

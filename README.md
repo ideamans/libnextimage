@@ -21,7 +21,7 @@ High-performance WebP and AVIF encoding/decoding library with FFI interface for 
 
 ## Development Status
 
-🚧 **Phase 1 Complete** - Foundation layer implemented
+✅ **Phase 1 Complete** - Foundation layer implemented
 
 - ✅ Core FFI interface
 - ✅ Memory management (alloc/into separation)
@@ -29,7 +29,64 @@ High-performance WebP and AVIF encoding/decoding library with FFI interface for 
 - ✅ CMake build system (normal/Debug/ASan/UBSan)
 - ✅ Basic test suite
 
-🔜 **Phase 2 Planned** - WebP integration (see [SPEC.md](SPEC.md))
+✅ **Phase 2 Complete** - WebP integration
+
+- ✅ libwebp integration (git submodule)
+- ✅ WebP C FFI (encode/decode)
+- ✅ Go bindings with explicit API
+- ✅ Comprehensive Go tests (12 tests all passing)
+
+🔜 **Phase 3 Planned** - AVIF integration (see [SPEC.md](SPEC.md))
+
+## Usage Example (Go)
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    "github.com/ideamans/libnextimage/golang"
+)
+
+func main() {
+    // Create test RGBA image
+    width, height := 640, 480
+    rgbaData := make([]byte, width*height*4)
+    // ... fill with your image data ...
+
+    // Encode to WebP
+    opts := libnextimage.DefaultWebPEncodeOptions()
+    opts.Quality = 90.0
+    opts.Method = 6  // Higher quality
+
+    webpData, err := libnextimage.WebPEncodeBytes(
+        rgbaData, width, height,
+        libnextimage.FormatRGBA,
+        opts,
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    // Save WebP file
+    os.WriteFile("output.webp", webpData, 0644)
+    fmt.Printf("Encoded to WebP: %d bytes\n", len(webpData))
+
+    // Decode WebP
+    decoded, err := libnextimage.WebPDecodeBytes(
+        webpData,
+        libnextimage.DefaultWebPDecodeOptions(),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Printf("Decoded: %dx%d, format=%d, bit_depth=%d\n",
+        decoded.Width, decoded.Height,
+        decoded.Format, decoded.BitDepth)
+}
+```
 
 ## Quick Start
 
@@ -103,8 +160,12 @@ libnextimage/
 │   │   ├── leak_counter_test.c
 │   │   └── sanitizer/
 │   └── CMakeLists.txt
-├── deps/                     # Dependencies (git submodules, TBD)
-├── golang/                   # Go bindings (TBD)
+├── deps/                     # Dependencies (git submodules)
+│   └── libwebp/              # WebP library
+├── golang/                   # Go bindings
+│   ├── common.go             # Common types & utilities
+│   ├── webp.go               # WebP Go API
+│   └── webp_test.go          # Comprehensive tests
 ├── lib/                      # Pre-compiled libraries (TBD)
 ├── SPEC.md                   # Detailed specification
 ├── DEPENDENCIES.txt          # Bill of Materials
@@ -121,24 +182,51 @@ libnextimage/
 
 ### Test Categories
 
-1. **Basic Tests** - Core functionality verification
-2. **Leak Counter Tests** - C heap leak detection (Debug build only)
-3. **Sanitizer Tests** - Memory safety validation (ASan/UBSan builds)
+1. **Basic Tests** - Core functionality verification (C)
+2. **WebP Tests** - WebP encoding/decoding (C)
+3. **Leak Counter Tests** - C heap leak detection (Debug build only)
+4. **Sanitizer Tests** - Memory safety validation (ASan/UBSan builds)
+5. **Go Tests** - WebP Go bindings and integration
 
-### Running Tests
+### Running C Tests
 
 ```bash
-# All tests
+# All C tests
+cd c/build
 ctest --output-on-failure
 
 # Specific test
 ./basic_test
+./webp_test
 
 # Debug build with leak counter
 cd build-debug && ./leak_counter_test
 
 # ASan build
 cd build-asan && ./sanitizer_test
+```
+
+### Running Go Tests
+
+```bash
+cd golang
+
+# All tests (verbose)
+go test -v
+
+# Specific test
+go test -v -run TestWebPEncode
+
+# With race detector
+go test -race
+
+# Benchmarks
+go test -bench=. -benchmem
+
+# Coverage
+go test -cover
+go test -coverprofile=coverage.out
+go tool cover -html=coverage.out
 ```
 
 ## License
@@ -156,9 +244,11 @@ This project is currently in active development (Phase 1). Contributions will be
   - Memory management
   - Error handling
   - Build system
-- [ ] **Phase 2**: WebP Integration (Weeks 3-4)
+- [x] **Phase 2**: WebP Integration (Complete)
   - libwebp integration
-  - Go bindings for WebP
+  - WebP C FFI (encode/decode)
+  - Go bindings with explicit API
+  - Comprehensive tests (C & Go)
 - [ ] **Phase 3**: AVIF Integration (Weeks 5-6)
   - libavif integration
   - Go bindings for AVIF
