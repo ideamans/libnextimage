@@ -53,25 +53,39 @@ set(WEBP_BUILD_LIBWEBPMUX OFF CACHE BOOL "" FORCE)
 set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp ${CMAKE_CURRENT_BINARY_DIR}/libwebp EXCLUDE_FROM_ALL)
 
+# libavif のビルド
+# AOMコーデックのみを使用（シンプルな構成）
+set(AVIF_CODEC_AOM LOCAL CACHE STRING "" FORCE)
+set(AVIF_CODEC_DAV1D OFF CACHE BOOL "" FORCE)
+set(AVIF_LIBYUV OFF CACHE BOOL "" FORCE)
+set(AVIF_BUILD_APPS OFF CACHE BOOL "" FORCE)
+set(AVIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(AVIF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(AVIF_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../deps/libavif ${CMAKE_CURRENT_BINARY_DIR}/libavif EXCLUDE_FROM_ALL)
+
 # インクルードディレクトリ
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libavif/include
 )
 
 # ソースファイル
 set(SOURCES
     src/common.c
     src/webp.c
+    src/avif.c
 )
 
 # 静的ライブラリのビルド
 add_library(nextimage STATIC ${SOURCES})
 
-# libwebp のリンク - Goからはこのライブラリのみをリンクすれば良いように
-# webp, webpdemux, sharpyuvを内部依存として持たせる
-target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv)
+# libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
+# webp, webpdemux, sharpyuv, avif を内部依存として持たせる
+target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv avif)
 
 # コンパイラ警告の有効化
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -112,42 +126,37 @@ install(CODE "
     set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
     file(MAKE_DIRECTORY \"\${LIB_DIR}\")
 
-    # Temporary directory for extraction
-    set(TEMP_DIR \"\${CMAKE_CURRENT_BINARY_DIR}/temp_combine\")
-    file(REMOVE_RECURSE \"\${TEMP_DIR}\")
-    file(MAKE_DIRECTORY \"\${TEMP_DIR}\")
-
-    # Extract all object files from each library
-    execute_process(
-        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
-        WORKING_DIRECTORY \"\${TEMP_DIR}\"
-    )
-    execute_process(
-        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
-        WORKING_DIRECTORY \"\${TEMP_DIR}\"
-    )
-    execute_process(
-        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
-        WORKING_DIRECTORY \"\${TEMP_DIR}\"
-    )
-    execute_process(
-        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
-        WORKING_DIRECTORY \"\${TEMP_DIR}\"
-    )
-
-    # Get all object files
-    file(GLOB OBJ_FILES \"\${TEMP_DIR}/*.o\")
-
-    # Create combined library
-    execute_process(
-        COMMAND ar -qc \"\${LIB_DIR}/libnextimage.a\" \${OBJ_FILES}
-        WORKING_DIRECTORY \"\${TEMP_DIR}\"
-    )
-
-    # Run ranlib
-    execute_process(
-        COMMAND ranlib \"\${LIB_DIR}/libnextimage.a\"
-    )
+    # Use libtool to combine libraries on macOS/BSD, or ar MRI script on Linux
+    if(APPLE)
+        # macOS: use libtool
+        execute_process(
+            COMMAND libtool -static -o \"\${LIB_DIR}/libnextimage.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
+        )
+    else()
+        # Linux/other: use ar MRI script
+        set(MRI_SCRIPT \"\${CMAKE_CURRENT_BINARY_DIR}/combine.mri\")
+        file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${LIB_DIR}/libnextimage.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"SAVE\\nEND\\n\")
+        execute_process(
+            COMMAND ar -M
+            INPUT_FILE \"\${MRI_SCRIPT}\"
+        )
+        execute_process(
+            COMMAND ranlib \"\${LIB_DIR}/libnextimage.a\"
+        )
+    endif()
 
     # Cleanup
     file(REMOVE_RECURSE \"\${TEMP_DIR}\")
@@ -158,6 +167,7 @@ install(CODE "
 install(FILES
     include/nextimage.h
     include/webp.h
+    include/avif.h
     DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -196,6 +206,22 @@ if(ENABLE_UBSAN)
 endif()
 
 add_test(NAME WebPTest COMMAND webp_test)
+
+# AVIFテスト
+add_executable(avif_test test/avif_test.c)
+target_link_libraries(avif_test nextimage)
+
+if(ENABLE_ASAN)
+    target_compile_options(avif_test PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(avif_test PRIVATE -fsanitize=address)
+endif()
+
+if(ENABLE_UBSAN)
+    target_compile_options(avif_test PRIVATE -fsanitize=undefined)
+    target_link_options(avif_test PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME AVIFTest COMMAND avif_test)
 
 # デバッグビルドのみ: リークカウンターテスト
 if(CMAKE_BUILD_TYPE MATCHES Debug)

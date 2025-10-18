@@ -36,7 +36,14 @@ High-performance WebP and AVIF encoding/decoding library with FFI interface for 
 - ✅ Go bindings with explicit API
 - ✅ Comprehensive Go tests (12 tests all passing)
 
-🔜 **Phase 3 Planned** - AVIF integration (see [SPEC.md](SPEC.md))
+✅ **Phase 3 Complete** - AVIF integration
+
+- ✅ libavif integration (git submodule with AOM codec)
+- ✅ AVIF C FFI (encode/decode with YUV format support)
+- ✅ Go bindings for AVIF
+- ✅ Comprehensive AVIF tests (13 Go tests + C tests all passing)
+- ✅ Support for 8/10/12-bit depth, YUV 4:4:4/4:2:2/4:2:0/4:0:0
+- ✅ Combined static library (libnextimage.a) with all dependencies
 
 ## Usage Example (Go)
 
@@ -235,7 +242,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Contributing
 
-This project is currently in active development (Phase 1). Contributions will be welcome once the core API is stabilized.
+This project is currently in active development (Phase 3 complete). Contributions will be welcome once the core API is stabilized.
 
 ## Roadmap
 
@@ -249,9 +256,13 @@ This project is currently in active development (Phase 1). Contributions will be
   - WebP C FFI (encode/decode)
   - Go bindings with explicit API
   - Comprehensive tests (C & Go)
-- [ ] **Phase 3**: AVIF Integration (Weeks 5-6)
-  - libavif integration
+- [x] **Phase 3**: AVIF Integration (Complete)
+  - libavif integration with AOM codec
+  - AVIF C FFI (encode/decode)
   - Go bindings for AVIF
+  - YUV format support (4:4:4/4:2:2/4:2:0/4:0:0)
+  - 8/10/12-bit depth support
+  - Comprehensive tests (C & Go)
 - [ ] **Phase 4**: New Features (Week 7)
   - webp2gif conversion
 - [ ] **Phase 5**: Security & Fuzzing (Weeks 8-9)
