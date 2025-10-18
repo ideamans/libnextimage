@@ -1,6 +1,7 @@
 package libnextimage
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -8,27 +9,23 @@ import (
 	"os"
 )
 
-// AVIFDecodeToPNG decodes AVIF data and saves it as a PNG file
+// AVIFDecodeToPNGBytes decodes AVIF data and returns PNG data as []byte
 // pngCompressionLevel: 0-9 (0=no compression, 9=best compression, -1=default)
-func AVIFDecodeToPNG(avifData []byte, outputPath string, options AVIFDecodeOptions, pngCompressionLevel int) error {
+func AVIFDecodeToPNGBytes(avifData []byte, options AVIFDecodeOptions, pngCompressionLevel int) ([]byte, error) {
 	// Decode AVIF to pixel data
 	decoded, err := AVIFDecodeBytes(avifData, options)
 	if err != nil {
-		return fmt.Errorf("avif decode to png: %w", err)
+		return nil, fmt.Errorf("avif decode to png bytes: %w", err)
 	}
 
 	// Convert to Go image.Image
 	img, err := decodedImageToGoImage(decoded)
 	if err != nil {
-		return fmt.Errorf("avif decode to png: %w", err)
+		return nil, fmt.Errorf("avif decode to png bytes: %w", err)
 	}
 
-	// Create output file
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("avif decode to png: failed to create file: %w", err)
-	}
-	defer outFile.Close()
+	// Create buffer for PNG data
+	var buf bytes.Buffer
 
 	// Set PNG encoder options
 	encoder := &png.Encoder{}
@@ -39,8 +36,23 @@ func AVIFDecodeToPNG(avifData []byte, outputPath string, options AVIFDecodeOptio
 	}
 
 	// Encode to PNG
-	if err := encoder.Encode(outFile, img); err != nil {
-		return fmt.Errorf("avif decode to png: failed to encode PNG: %w", err)
+	if err := encoder.Encode(&buf, img); err != nil {
+		return nil, fmt.Errorf("avif decode to png bytes: failed to encode PNG: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// AVIFDecodeToPNG decodes AVIF data and saves it as a PNG file
+// pngCompressionLevel: 0-9 (0=no compression, 9=best compression, -1=default)
+func AVIFDecodeToPNG(avifData []byte, outputPath string, options AVIFDecodeOptions, pngCompressionLevel int) error {
+	pngData, err := AVIFDecodeToPNGBytes(avifData, options, pngCompressionLevel)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(outputPath, pngData, 0644); err != nil {
+		return fmt.Errorf("avif decode to png: failed to write file: %w", err)
 	}
 
 	return nil
@@ -55,27 +67,20 @@ func AVIFDecodeFileToPNG(avifPath, pngPath string, options AVIFDecodeOptions, pn
 	return AVIFDecodeToPNG(data, pngPath, options, pngCompressionLevel)
 }
 
-// AVIFDecodeToJPEG decodes AVIF data and saves it as a JPEG file
+// AVIFDecodeToJPEGBytes decodes AVIF data and returns JPEG data as []byte
 // jpegQuality: 1-100 (higher is better quality)
-func AVIFDecodeToJPEG(avifData []byte, outputPath string, options AVIFDecodeOptions, jpegQuality int) error {
+func AVIFDecodeToJPEGBytes(avifData []byte, options AVIFDecodeOptions, jpegQuality int) ([]byte, error) {
 	// Decode AVIF to pixel data
 	decoded, err := AVIFDecodeBytes(avifData, options)
 	if err != nil {
-		return fmt.Errorf("avif decode to jpeg: %w", err)
+		return nil, fmt.Errorf("avif decode to jpeg bytes: %w", err)
 	}
 
 	// Convert to Go image.Image
 	img, err := decodedImageToGoImage(decoded)
 	if err != nil {
-		return fmt.Errorf("avif decode to jpeg: %w", err)
+		return nil, fmt.Errorf("avif decode to jpeg bytes: %w", err)
 	}
-
-	// Create output file
-	outFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("avif decode to jpeg: failed to create file: %w", err)
-	}
-	defer outFile.Close()
 
 	// Set JPEG quality
 	quality := jpegQuality
@@ -85,9 +90,27 @@ func AVIFDecodeToJPEG(avifData []byte, outputPath string, options AVIFDecodeOpti
 		quality = 100
 	}
 
+	// Create buffer for JPEG data
+	var buf bytes.Buffer
+
 	// Encode to JPEG
-	if err := jpeg.Encode(outFile, img, &jpeg.Options{Quality: quality}); err != nil {
-		return fmt.Errorf("avif decode to jpeg: failed to encode JPEG: %w", err)
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
+		return nil, fmt.Errorf("avif decode to jpeg bytes: failed to encode JPEG: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+// AVIFDecodeToJPEG decodes AVIF data and saves it as a JPEG file
+// jpegQuality: 1-100 (higher is better quality)
+func AVIFDecodeToJPEG(avifData []byte, outputPath string, options AVIFDecodeOptions, jpegQuality int) error {
+	jpegData, err := AVIFDecodeToJPEGBytes(avifData, options, jpegQuality)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(outputPath, jpegData, 0644); err != nil {
+		return fmt.Errorf("avif decode to jpeg: failed to write file: %w", err)
 	}
 
 	return nil

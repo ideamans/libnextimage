@@ -541,23 +541,6 @@ func WebPDecodeFile(inputPath string, opts WebPDecodeOptions) (*DecodedImage, er
 	return WebPDecodeBytes(data, opts)
 }
 
-// WebPDecodeToFile decodes WebP data and writes to a file
-func WebPDecodeToFile(webpData []byte, outputPath string, opts WebPDecodeOptions) error {
-	img, err := WebPDecodeBytes(webpData, opts)
-	if err != nil {
-		return err
-	}
-
-	// For now, just write raw pixel data
-	// TODO: Implement proper image encoding based on output format
-	err = os.WriteFile(outputPath, img.Data, 0644)
-	if err != nil {
-		return fmt.Errorf("webp decode to file: %w", err)
-	}
-
-	return nil
-}
-
 // WebPDecodeSize calculates required buffer size for decoding
 func WebPDecodeSize(webpData []byte) (width, height int, requiredSize int, err error) {
 	clearError()

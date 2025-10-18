@@ -92,41 +92,38 @@ import (
 )
 
 func main() {
-    // Create test RGBA image
-    width, height := 640, 480
-    rgbaData := make([]byte, width*height*4)
-    // ... fill with your image data ...
+    // Read PNG file
+    pngData, err := os.ReadFile("input.png")
+    if err != nil {
+        panic(err)
+    }
 
-    // Encode to WebP
+    // Convert PNG → WebP
     opts := libnextimage.DefaultWebPEncodeOptions()
     opts.Quality = 90.0
     opts.Method = 6  // Higher quality
 
-    webpData, err := libnextimage.WebPEncodeBytes(
-        rgbaData, width, height,
-        libnextimage.FormatRGBA,
-        opts,
-    )
+    webpData, err := libnextimage.WebPEncodeBytes(pngData, opts)
     if err != nil {
         panic(err)
     }
 
     // Save WebP file
     os.WriteFile("output.webp", webpData, 0644)
-    fmt.Printf("Encoded to WebP: %d bytes\n", len(webpData))
+    fmt.Printf("PNG→WebP conversion complete: %d bytes\n", len(webpData))
 
-    // Decode WebP
-    decoded, err := libnextimage.WebPDecodeBytes(
+    // Convert WebP → PNG (memory-based)
+    pngDataOut, err := libnextimage.WebPDecodeToPNGBytes(
         webpData,
         libnextimage.DefaultWebPDecodeOptions(),
+        9, // PNG compression level
     )
     if err != nil {
         panic(err)
     }
 
-    fmt.Printf("Decoded: %dx%d, format=%d, bit_depth=%d\n",
-        decoded.Width, decoded.Height,
-        decoded.Format, decoded.BitDepth)
+    fmt.Printf("WebP→PNG conversion complete: %d bytes\n", len(pngDataOut))
+    os.WriteFile("output.png", pngDataOut, 0644)
 }
 ```
 

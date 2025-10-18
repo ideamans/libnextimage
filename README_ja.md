@@ -33,41 +33,38 @@ import (
 )
 
 func main() {
-    // テスト用RGBA画像の作成
-    width, height := 640, 480
-    rgbaData := make([]byte, width*height*4)
-    // ... 画像データを埋める ...
+    // PNGファイルを読み込み
+    pngData, err := os.ReadFile("input.png")
+    if err != nil {
+        panic(err)
+    }
 
-    // WebPへエンコード
+    // PNG→WebP変換
     opts := libnextimage.DefaultWebPEncodeOptions()
     opts.Quality = 90.0
     opts.Method = 6  // 高品質
 
-    webpData, err := libnextimage.WebPEncodeBytes(
-        rgbaData, width, height,
-        libnextimage.FormatRGBA,
-        opts,
-    )
+    webpData, err := libnextimage.WebPEncodeBytes(pngData, opts)
     if err != nil {
         panic(err)
     }
 
     // WebPファイルを保存
     os.WriteFile("output.webp", webpData, 0644)
-    fmt.Printf("WebPにエンコード: %d バイト\n", len(webpData))
+    fmt.Printf("PNG→WebP変換完了: %d バイト\n", len(webpData))
 
-    // WebPをデコード
-    decoded, err := libnextimage.WebPDecodeBytes(
+    // WebP→PNGに戻す（メモリ版）
+    pngDataOut, err := libnextimage.WebPDecodeToPNGBytes(
         webpData,
         libnextimage.DefaultWebPDecodeOptions(),
+        9, // PNG圧縮レベル
     )
     if err != nil {
         panic(err)
     }
 
-    fmt.Printf("デコード完了: %dx%d, format=%d, bit_depth=%d\n",
-        decoded.Width, decoded.Height,
-        decoded.Format, decoded.BitDepth)
+    fmt.Printf("WebP→PNG変換完了: %d バイト\n", len(pngDataOut))
+    os.WriteFile("output.png", pngDataOut, 0644)
 }
 ```
 
