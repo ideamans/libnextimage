@@ -13,17 +13,65 @@ import (
 
 // AVIFEncodeOptions represents AVIF encoding options
 type AVIFEncodeOptions struct {
-	Quality           int // 0-100, default 50 (mapped to AVIF quantizer 0-63)
-	Speed             int // 0-10, default 6 (0=slowest/best, 10=fastest/worst)
-	MinQuantizer      int // 0-63, default 0 (best quality)
-	MaxQuantizer      int // 0-63, default 63 (worst quality)
-	MinQuantizerAlpha int // 0-63, default 0
-	MaxQuantizerAlpha int // 0-63, default 63
+	// Quality settings
+	Quality      int // 0-100, default 60 (for color/YUV)
+	QualityAlpha int // 0-100, default -1 (use Quality if -1)
+	Speed        int // 0-10, default 6 (0=slowest/best, 10=fastest/worst)
+
+	// Deprecated quantizer settings (for backward compatibility)
+	MinQuantizer      int // 0-63, default -1 (use Quality instead)
+	MaxQuantizer      int // 0-63, default -1 (use Quality instead)
+	MinQuantizerAlpha int // 0-63, default -1 (use QualityAlpha instead)
+	MaxQuantizerAlpha int // 0-63, default -1 (use QualityAlpha instead)
+
+	// Format settings
+	BitDepth  int // 8, 10, or 12 (default: 8)
+	YUVFormat int // 0=444, 1=422, 2=420, 3=400 (default: 444)
+	YUVRange  int // 0=limited, 1=full (default: 1=full)
+
+	// Alpha settings
 	EnableAlpha       bool
-	BitDepth          int // 8, 10, or 12 (default: 8)
-	YUVFormat         int // 0=444, 1=422, 2=420, 3=400 (default: 420)
-	TileRowsLog2      int // 0-6, default 0
-	TileColsLog2      int // 0-6, default 0
+	PremultiplyAlpha  bool // Premultiply color by alpha
+
+	// Tiling settings
+	TileRowsLog2 int // 0-6, default 0
+	TileColsLog2 int // 0-6, default 0
+
+	// CICP (nclx) color settings
+	ColorPrimaries          int // CICP color primaries, -1=auto
+	TransferCharacteristics int // CICP transfer, -1=auto
+	MatrixCoefficients      int // CICP matrix, -1=auto
+
+	// Advanced settings
+	SharpYUV   bool // Use sharp RGB->YUV conversion
+	TargetSize int  // Target file size in bytes, 0=disabled
+
+	// Metadata settings
+	ExifData []byte // EXIF metadata bytes (nil=no EXIF)
+	XMPData  []byte // XMP metadata bytes (nil=no XMP)
+	ICCData  []byte // ICC profile bytes (nil=no ICC)
+
+	// Transformation settings
+	IRotAngle int // Image rotation: 0-3 (90 * angle degrees anti-clockwise), -1=disabled
+	IMirAxis  int // Image mirror: 0=vertical, 1=horizontal, -1=disabled
+
+	// Pixel aspect ratio (pasp) - array[2]: [h_spacing, v_spacing]
+	PASP [2]int // -1=disabled, otherwise [h_spacing, v_spacing]
+
+	// Crop rectangle (simpler interface) - array[4]: [x, y, width, height]
+	// This will be converted to clap using avifCleanApertureBoxFromCropRect
+	Crop [4]int // -1=disabled, otherwise [x, y, width, height]
+
+	// Clean aperture (clap) - array[8]: [wN,wD, hN,hD, hOffN,hOffD, vOffN,vOffD]
+	// Use this for direct clap values, or use Crop[] for simpler interface
+	CLAP [8]int // -1=disabled, otherwise [widthN,widthD, heightN,heightD, horizOffN,horizOffD, vertOffN,vertOffD]
+
+	// Content light level information (clli) - array[2]: [maxCLL, maxPALL]
+	CLLI [2]int // -1=disabled, otherwise [maxCLL, maxPALL]
+
+	// Animation settings (for future use)
+	Timescale        int // Timescale/fps for animations (default: 30)
+	KeyframeInterval int // Max keyframe interval (default: 0=disabled)
 }
 
 // AVIFDecodeOptions represents AVIF decoding options
@@ -40,17 +88,33 @@ func DefaultAVIFEncodeOptions() AVIFEncodeOptions {
 	C.nextimage_avif_default_encode_options(&opts)
 
 	return AVIFEncodeOptions{
-		Quality:           int(opts.quality),
-		Speed:             int(opts.speed),
-		MinQuantizer:      int(opts.min_quantizer),
-		MaxQuantizer:      int(opts.max_quantizer),
-		MinQuantizerAlpha: int(opts.min_quantizer_alpha),
-		MaxQuantizerAlpha: int(opts.max_quantizer_alpha),
-		EnableAlpha:       opts.enable_alpha != 0,
-		BitDepth:          int(opts.bit_depth),
-		YUVFormat:         int(opts.yuv_format),
-		TileRowsLog2:      int(opts.tile_rows_log2),
-		TileColsLog2:      int(opts.tile_cols_log2),
+		Quality:                 int(opts.quality),
+		QualityAlpha:            int(opts.quality_alpha),
+		Speed:                   int(opts.speed),
+		MinQuantizer:            int(opts.min_quantizer),
+		MaxQuantizer:            int(opts.max_quantizer),
+		MinQuantizerAlpha:       int(opts.min_quantizer_alpha),
+		MaxQuantizerAlpha:       int(opts.max_quantizer_alpha),
+		BitDepth:                int(opts.bit_depth),
+		YUVFormat:               int(opts.yuv_format),
+		YUVRange:                int(opts.yuv_range),
+		EnableAlpha:             opts.enable_alpha != 0,
+		PremultiplyAlpha:        opts.premultiply_alpha != 0,
+		TileRowsLog2:            int(opts.tile_rows_log2),
+		TileColsLog2:            int(opts.tile_cols_log2),
+		ColorPrimaries:          int(opts.color_primaries),
+		TransferCharacteristics: int(opts.transfer_characteristics),
+		MatrixCoefficients:      int(opts.matrix_coefficients),
+		SharpYUV:     opts.sharp_yuv != 0,
+		TargetSize:   int(opts.target_size),
+		IRotAngle:    int(opts.irot_angle),
+		IMirAxis:     int(opts.imir_axis),
+		PASP:         [2]int{int(opts.pasp[0]), int(opts.pasp[1])},
+		Crop:         [4]int{int(opts.crop[0]), int(opts.crop[1]), int(opts.crop[2]), int(opts.crop[3])},
+		CLAP:         [8]int{int(opts.clap[0]), int(opts.clap[1]), int(opts.clap[2]), int(opts.clap[3]), int(opts.clap[4]), int(opts.clap[5]), int(opts.clap[6]), int(opts.clap[7])},
+		CLLI:         [2]int{int(opts.clli_max_cll), int(opts.clli_max_pall)},
+		Timescale:    int(opts.timescale),
+		KeyframeInterval: int(opts.keyframe_interval),
 	}
 }
 
@@ -70,21 +134,81 @@ func DefaultAVIFDecodeOptions() AVIFDecodeOptions {
 // toCEncodeOptions converts Go options to C options
 func (opts *AVIFEncodeOptions) toCEncodeOptions() C.NextImageAVIFEncodeOptions {
 	var copts C.NextImageAVIFEncodeOptions
+
+	// Quality settings
 	copts.quality = C.int(opts.Quality)
+	copts.quality_alpha = C.int(opts.QualityAlpha)
 	copts.speed = C.int(opts.Speed)
+
+	// Deprecated quantizer settings
 	copts.min_quantizer = C.int(opts.MinQuantizer)
 	copts.max_quantizer = C.int(opts.MaxQuantizer)
 	copts.min_quantizer_alpha = C.int(opts.MinQuantizerAlpha)
 	copts.max_quantizer_alpha = C.int(opts.MaxQuantizerAlpha)
-	if opts.EnableAlpha {
-		copts.enable_alpha = 1
-	} else {
-		copts.enable_alpha = 0
-	}
+
+	// Format settings
 	copts.bit_depth = C.int(opts.BitDepth)
 	copts.yuv_format = C.int(opts.YUVFormat)
+	copts.yuv_range = C.int(opts.YUVRange)
+
+	// Alpha settings
+	if opts.EnableAlpha {
+		copts.enable_alpha = 1
+	}
+	if opts.PremultiplyAlpha {
+		copts.premultiply_alpha = 1
+	}
+
+	// Tiling settings
 	copts.tile_rows_log2 = C.int(opts.TileRowsLog2)
 	copts.tile_cols_log2 = C.int(opts.TileColsLog2)
+
+	// CICP color settings
+	copts.color_primaries = C.int(opts.ColorPrimaries)
+	copts.transfer_characteristics = C.int(opts.TransferCharacteristics)
+	copts.matrix_coefficients = C.int(opts.MatrixCoefficients)
+
+	// Advanced settings
+	if opts.SharpYUV {
+		copts.sharp_yuv = 1
+	}
+	copts.target_size = C.int(opts.TargetSize)
+
+	// Metadata settings - will be set in the caller to avoid Go pointer issues
+	// The caller must set these pointers and manage their lifetime
+
+	// Transformation settings
+	copts.irot_angle = C.int(opts.IRotAngle)
+	copts.imir_axis = C.int(opts.IMirAxis)
+
+	// Pixel aspect ratio (pasp)
+	copts.pasp[0] = C.int(opts.PASP[0])
+	copts.pasp[1] = C.int(opts.PASP[1])
+
+	// Crop rectangle
+	copts.crop[0] = C.int(opts.Crop[0])
+	copts.crop[1] = C.int(opts.Crop[1])
+	copts.crop[2] = C.int(opts.Crop[2])
+	copts.crop[3] = C.int(opts.Crop[3])
+
+	// Clean aperture (clap)
+	copts.clap[0] = C.int(opts.CLAP[0])
+	copts.clap[1] = C.int(opts.CLAP[1])
+	copts.clap[2] = C.int(opts.CLAP[2])
+	copts.clap[3] = C.int(opts.CLAP[3])
+	copts.clap[4] = C.int(opts.CLAP[4])
+	copts.clap[5] = C.int(opts.CLAP[5])
+	copts.clap[6] = C.int(opts.CLAP[6])
+	copts.clap[7] = C.int(opts.CLAP[7])
+
+	// Content light level information (clli)
+	copts.clli_max_cll = C.int(opts.CLLI[0])
+	copts.clli_max_pall = C.int(opts.CLLI[1])
+
+	// Animation settings
+	copts.timescale = C.int(opts.Timescale)
+	copts.keyframe_interval = C.int(opts.KeyframeInterval)
+
 	return copts
 }
 
@@ -125,6 +249,28 @@ func AVIFEncodeBytes(
 
 	// Convert options
 	copts := options.toCEncodeOptions()
+
+	// Copy metadata to C memory to avoid Go pointer issues
+	// We need to free these after the C call
+	var exifPtr, xmpPtr, iccPtr unsafe.Pointer
+	if len(options.ExifData) > 0 {
+		exifPtr = C.CBytes(options.ExifData)
+		defer C.free(exifPtr)
+		copts.exif_data = (*C.uint8_t)(exifPtr)
+		copts.exif_size = C.size_t(len(options.ExifData))
+	}
+	if len(options.XMPData) > 0 {
+		xmpPtr = C.CBytes(options.XMPData)
+		defer C.free(xmpPtr)
+		copts.xmp_data = (*C.uint8_t)(xmpPtr)
+		copts.xmp_size = C.size_t(len(options.XMPData))
+	}
+	if len(options.ICCData) > 0 {
+		iccPtr = C.CBytes(options.ICCData)
+		defer C.free(iccPtr)
+		copts.icc_data = (*C.uint8_t)(iccPtr)
+		copts.icc_size = C.size_t(len(options.ICCData))
+	}
 
 	// Encode
 	var output C.NextImageEncodeBuffer

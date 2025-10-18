@@ -1,0 +1,118 @@
+package libnextimage
+
+import (
+	"os"
+	"testing"
+)
+
+func TestWebP2GIF(t *testing.T) {
+	// Read PNG file
+	pngData, err := os.ReadFile("../testdata/png/red.png")
+	if err != nil {
+		t.Fatalf("Failed to read PNG file: %v", err)
+	}
+	t.Logf("Read PNG file: %d bytes", len(pngData))
+
+	// Encode to WebP first
+	opts := DefaultWebPEncodeOptions()
+	opts.Quality = 90
+
+	webpData, err := WebPEncodeBytes(pngData, opts)
+	if err != nil {
+		t.Fatalf("WebP encode failed: %v", err)
+	}
+	t.Logf("Encoded to WebP: %d bytes", len(webpData))
+
+	// Convert WebP to GIF
+	gifData, err := WebP2GIFConvertBytes(webpData)
+	if err != nil {
+		t.Fatalf("WebP to GIF conversion failed: %v", err)
+	}
+
+	if len(gifData) == 0 {
+		t.Fatal("GIF data is empty")
+	}
+
+	t.Logf("Converted to GIF: %d bytes", len(gifData))
+
+	// Optionally save for manual inspection
+	_ = os.WriteFile("/tmp/test_go_webp2gif.gif", gifData, 0644)
+	t.Log("Saved to /tmp/test_go_webp2gif.gif")
+}
+
+func TestWebP2GIF_FromFile(t *testing.T) {
+	// First create a WebP file
+	pngData, _ := os.ReadFile("../testdata/png/blue.png")
+	opts := DefaultWebPEncodeOptions()
+	opts.Quality = 85
+
+	webpData, _ := WebPEncodeBytes(pngData, opts)
+	tempWebP := "/tmp/test_input.webp"
+	_ = os.WriteFile(tempWebP, webpData, 0644)
+	defer os.Remove(tempWebP)
+
+	// Convert WebP file to GIF
+	gifData, err := WebP2GIFConvertFile(tempWebP)
+	if err != nil {
+		t.Fatalf("WebP to GIF conversion from file failed: %v", err)
+	}
+
+	if len(gifData) == 0 {
+		t.Fatal("GIF data is empty")
+	}
+
+	t.Logf("Converted WebP file to GIF: %d bytes", len(gifData))
+}
+
+func TestWebP2GIF_Transparency(t *testing.T) {
+	// Test with a PNG that has transparency
+	pngData, err := os.ReadFile("../testdata/png/red.png")
+	if err != nil {
+		t.Fatalf("Failed to read PNG file: %v", err)
+	}
+
+	// Encode to WebP with lossless to preserve alpha
+	opts := DefaultWebPEncodeOptions()
+	opts.Lossless = true
+
+	webpData, err := WebPEncodeBytes(pngData, opts)
+	if err != nil {
+		t.Fatalf("WebP encode failed: %v", err)
+	}
+
+	// Convert to GIF (transparency will be quantized)
+	gifData, err := WebP2GIFConvertBytes(webpData)
+	if err != nil {
+		t.Fatalf("WebP to GIF conversion failed: %v", err)
+	}
+
+	if len(gifData) == 0 {
+		t.Fatal("GIF data is empty")
+	}
+
+	t.Logf("Converted transparent WebP to GIF: %d bytes", len(gifData))
+
+	// Save for manual inspection
+	_ = os.WriteFile("/tmp/test_go_webp2gif_alpha.gif", gifData, 0644)
+	t.Log("Saved to /tmp/test_go_webp2gif_alpha.gif")
+}
+
+// Note: GIF to WebP conversion is not supported because libwebp's imageio
+// does not recognize GIF format. Users should use dedicated tools for GIF to WebP.
+func TestGIF2WebP_NotSupported(t *testing.T) {
+	// This test verifies that GIF2WebP returns an appropriate error
+	gifData, err := os.ReadFile("../testdata/gif/static.gif")
+	if err != nil {
+		t.Skip("GIF test file not available")
+	}
+
+	opts := DefaultWebPEncodeOptions()
+	_, err = GIF2WebPEncodeBytes(gifData, opts)
+
+	// We expect this to fail because libwebp imageio doesn't support GIF
+	if err == nil {
+		t.Fatal("Expected GIF2WebP to fail, but it succeeded")
+	}
+
+	t.Logf("GIF2WebP correctly returned error: %v", err)
+}

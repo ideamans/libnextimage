@@ -1,6 +1,8 @@
 #include "avif.h"
 #include "internal.h"
 #include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 // libavif headers
 #include "avif/avif.h"
@@ -10,23 +12,117 @@
 
 // libwebp Picture for intermediate conversion
 #include "webp/encode.h"
+#include "webp/decode.h"
+
+// Platform-specific headers for CPU count query
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <sys/sysctl.h>
+#else
+#include <unistd.h>
+#endif
+
+// Query CPU count (based on avifutil.c from libavif apps)
+static int queryCPUCount(void) {
+#if defined(_WIN32)
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return (int)sysinfo.dwNumberOfProcessors;
+#elif defined(__APPLE__)
+    int mib[2];
+    int numCPU;
+    size_t len = sizeof(numCPU);
+
+    mib[0] = CTL_HW;
+    mib[1] = HW_AVAILCPU;
+
+    sysctl(mib, 2, &numCPU, &len, NULL, 0);
+
+    if (numCPU < 1) {
+        mib[1] = HW_NCPU;
+        sysctl(mib, 2, &numCPU, &len, NULL, 0);
+        if (numCPU < 1)
+            numCPU = 1;
+    }
+    return numCPU;
+#else
+    // POSIX
+    int numCPU = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    return (numCPU > 0) ? numCPU : 1;
+#endif
+}
 
 // デフォルトエンコードオプション
 void nextimage_avif_default_encode_options(NextImageAVIFEncodeOptions* options) {
     if (!options) return;
 
     memset(options, 0, sizeof(NextImageAVIFEncodeOptions));
-    options->quality = 50;
-    options->speed = AVIF_SPEED_DEFAULT;  // 6
-    options->min_quantizer = AVIF_QUANTIZER_BEST_QUALITY;  // 0
-    options->max_quantizer = AVIF_QUANTIZER_WORST_QUALITY; // 63
-    options->min_quantizer_alpha = AVIF_QUANTIZER_BEST_QUALITY;
-    options->max_quantizer_alpha = AVIF_QUANTIZER_WORST_QUALITY;
-    options->enable_alpha = 1;
+
+    // Quality settings (avifenc defaults)
+    options->quality = 60;        // avifenc default quality (line 855 in avifenc.c)
+    options->quality_alpha = -1;  // -1 means use quality value
+    options->speed = 6;           // avifenc default speed (line 1466) - NOT AVIF_SPEED_DEFAULT!
+
+    // Deprecated quantizer settings (for backward compatibility)
+    options->min_quantizer = -1;       // -1 means "use quality setting"
+    options->max_quantizer = -1;       // -1 means "use quality setting"
+    options->min_quantizer_alpha = -1; // -1 means "use quality_alpha setting"
+    options->max_quantizer_alpha = -1; // -1 means "use quality_alpha setting"
+
+    // Format settings
     options->bit_depth = 8;
-    options->yuv_format = 2; // 420
+    options->yuv_format = 0;  // 444 (avifenc default for PNG, line 1467)
+    options->yuv_range = 1;   // full range (avifenc default for PNG/JPEG, line 1468)
+
+    // Alpha settings
+    options->enable_alpha = 1;
+    options->premultiply_alpha = 0;
+
+    // Tiling settings
     options->tile_rows_log2 = 0;
     options->tile_cols_log2 = 0;
+
+    // CICP (nclx) color settings - avifenc defaults (lines 1469-1471)
+    options->color_primaries = 1;        // BT709 (avifenc default)
+    options->transfer_characteristics = 13; // sRGB (avifenc default)
+    options->matrix_coefficients = 6;    // BT601 (avifenc default)
+
+    // Advanced settings
+    options->sharp_yuv = 0;
+    options->target_size = 0;  // disabled
+
+    // Transformation settings
+    options->irot_angle = -1;      // disabled
+    options->imir_axis = -1;       // disabled
+
+    // Pixel aspect ratio (pasp)
+    options->pasp[0] = -1;  // disabled
+    options->pasp[1] = -1;
+
+    // Crop rectangle
+    options->crop[0] = -1;  // disabled
+    options->crop[1] = -1;
+    options->crop[2] = -1;
+    options->crop[3] = -1;
+
+    // Clean aperture (clap)
+    options->clap[0] = -1;  // disabled (widthN)
+    options->clap[1] = 1;   // widthD
+    options->clap[2] = -1;  // heightN
+    options->clap[3] = 1;   // heightD
+    options->clap[4] = 0;   // horizOffN
+    options->clap[5] = 1;   // horizOffD
+    options->clap[6] = 0;   // vertOffN
+    options->clap[7] = 1;   // vertOffD
+
+    // Content light level information (clli)
+    options->clli_max_cll = -1;    // disabled
+    options->clli_max_pall = -1;   // disabled
+
+    // Animation settings
+    options->timescale = 30;
+    options->keyframe_interval = 0;  // disabled
 }
 
 // デフォルトデコードオプション
@@ -38,15 +134,6 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
     options->format = NEXTIMAGE_FORMAT_RGBA;
     options->ignore_exif = 0;
     options->ignore_xmp = 0;
-}
-
-// Quality (0-100) をAVIF quantizer (0-63)に変換
-// quality 100 -> quantizer 0 (best)
-// quality 0   -> quantizer 63 (worst)
-static int quality_to_quantizer(int quality) {
-    if (quality < 0) quality = 0;
-    if (quality > 100) quality = 100;
-    return (int)(AVIF_QUANTIZER_WORST_QUALITY - (quality * AVIF_QUANTIZER_WORST_QUALITY / 100.0));
 }
 
 // YUV format を avifPixelFormat に変換
@@ -111,10 +198,16 @@ NextImageStatus nextimage_avif_encode_alloc(
 
     // WebPPictureに一旦読み込む（imageioを使うため）
     WebPPicture picture;
+    // CRITICAL: Zero-initialize to prevent stack memory pollution between calls
+    memset(&picture, 0, sizeof(WebPPicture));
     if (!WebPPictureInit(&picture)) {
         nextimage_set_error("Failed to initialize WebPPicture");
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
+
+    // CRITICAL: Set use_argb BEFORE calling reader to request ARGB format
+    // The reader checks this flag and preserves ARGB if set
+    picture.use_argb = 1;
 
     if (!reader(input_data, input_size, &picture, 1, NULL)) {
         WebPPictureFree(&picture);
@@ -135,11 +228,49 @@ NextImageStatus nextimage_avif_encode_alloc(
         return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
     }
 
+    // Set color properties from options (CICP/nclx)
+    // Use options values if specified, otherwise use defaults
+    if (options->color_primaries >= 0) {
+        image->colorPrimaries = (avifColorPrimaries)options->color_primaries;
+    } else {
+        image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;  // default
+    }
+
+    if (options->transfer_characteristics >= 0) {
+        image->transferCharacteristics = (avifTransferCharacteristics)options->transfer_characteristics;
+    } else {
+        image->transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SRGB;  // default: sRGB
+    }
+
+    if (options->matrix_coefficients >= 0) {
+        image->matrixCoefficients = (avifMatrixCoefficients)options->matrix_coefficients;
+    } else {
+        image->matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_BT601;  // default
+    }
+
+    // Set YUV range (limited vs full)
+    image->yuvRange = (options->yuv_range == 0) ? AVIF_RANGE_LIMITED : AVIF_RANGE_FULL;
+
+    // Set alpha premultiplication flag
+    if (options->premultiply_alpha) {
+        image->alphaPremultiplied = AVIF_TRUE;
+    }
+
     // avifRGBImageを設定
     avifRGBImage rgb;
+    // CRITICAL: Zero-initialize to match avifenc behavior
+    memset(&rgb, 0, sizeof(avifRGBImage));
+
     avifRGBImageSetDefaults(&rgb, image);
     rgb.format = AVIF_RGB_FORMAT_RGBA;
     rgb.depth = 8;
+
+    // Set chroma downsampling method (SharpYUV if requested)
+    if (options->sharp_yuv && options->yuv_format == 2) {  // YUV420 only
+        rgb.chromaDownsampling = AVIF_CHROMA_DOWNSAMPLING_SHARP_YUV;
+    } else {
+        rgb.chromaDownsampling = AVIF_CHROMA_DOWNSAMPLING_AUTOMATIC;
+    }
 
     // RGBAバッファを割り当て
     avifResult allocResult = avifRGBImageAllocatePixels(&rgb);
@@ -150,13 +281,33 @@ NextImageStatus nextimage_avif_encode_alloc(
         return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
     }
 
-    // WebPPictureのピクセルをRGBバッファにコピー
-    if (!WebPPictureImportRGBA(&picture, rgb.pixels, rgb.rowBytes)) {
+    // WebPPictureのARGBデータをavifRGBImageにコピー
+    // picture.use_argb=1を事前設定しているため、readerはARGBフォーマットで読み込むはず
+    if (!picture.use_argb || !picture.argb) {
         avifRGBImageFreePixels(&rgb);
         avifImageDestroy(image);
         WebPPictureFree(&picture);
-        nextimage_set_error("Failed to import RGBA data");
-        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+        nextimage_set_error("WebPPicture is not in ARGB format (use_argb=%d, argb=%p)",
+                           picture.use_argb, (void*)picture.argb);
+        return NEXTIMAGE_ERROR_DECODE_FAILED;
+    }
+
+    // ARGB (uint32_t) -> RGBA (uint8_t) conversion
+    const uint32_t* src = picture.argb;
+    uint8_t* dst = rgb.pixels;
+    for (int y = 0; y < picture.height; y++) {
+        for (int x = 0; x < picture.width; x++) {
+            const uint32_t argb_val = src[y * picture.argb_stride + x];
+            const uint8_t a = (argb_val >> 24) & 0xFF;
+            const uint8_t r = (argb_val >> 16) & 0xFF;
+            const uint8_t g = (argb_val >> 8) & 0xFF;
+            const uint8_t b = argb_val & 0xFF;
+
+            dst[y * rgb.rowBytes + x * 4 + 0] = r;
+            dst[y * rgb.rowBytes + x * 4 + 1] = g;
+            dst[y * rgb.rowBytes + x * 4 + 2] = b;
+            dst[y * rgb.rowBytes + x * 4 + 3] = a;
+        }
     }
 
     // RGBからYUVに変換
@@ -170,6 +321,104 @@ NextImageStatus nextimage_avif_encode_alloc(
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 
+    // Set metadata (EXIF, XMP, ICC) if provided
+    if (options->exif_data && options->exif_size > 0) {
+        result = avifImageSetMetadataExif(image, options->exif_data, options->exif_size);
+        if (result != AVIF_RESULT_OK) {
+            avifImageDestroy(image);
+            nextimage_set_error("Failed to set EXIF metadata: %s", avifResultToString(result));
+            return NEXTIMAGE_ERROR_ENCODE_FAILED;
+        }
+    }
+
+    if (options->xmp_data && options->xmp_size > 0) {
+        result = avifImageSetMetadataXMP(image, options->xmp_data, options->xmp_size);
+        if (result != AVIF_RESULT_OK) {
+            avifImageDestroy(image);
+            nextimage_set_error("Failed to set XMP metadata: %s", avifResultToString(result));
+            return NEXTIMAGE_ERROR_ENCODE_FAILED;
+        }
+    }
+
+    if (options->icc_data && options->icc_size > 0) {
+        result = avifImageSetProfileICC(image, options->icc_data, options->icc_size);
+        if (result != AVIF_RESULT_OK) {
+            avifImageDestroy(image);
+            nextimage_set_error("Failed to set ICC profile: %s", avifResultToString(result));
+            return NEXTIMAGE_ERROR_ENCODE_FAILED;
+        }
+    }
+
+    // Set transformation properties
+    // Note: transformFlags must be set to enable encoding of these properties
+    image->transformFlags = 0;
+
+    // Image rotation (irot)
+    if (options->irot_angle >= 0 && options->irot_angle <= 3) {
+        image->irot.angle = (uint8_t)options->irot_angle;
+        image->transformFlags |= AVIF_TRANSFORM_IROT;
+    }
+
+    // Image mirror (imir)
+    if (options->imir_axis >= 0 && options->imir_axis <= 1) {
+        image->imir.axis = (uint8_t)options->imir_axis;
+        image->transformFlags |= AVIF_TRANSFORM_IMIR;
+    }
+
+    // Pixel aspect ratio (pasp)
+    if (options->pasp[0] >= 0 && options->pasp[1] >= 0) {
+        image->pasp.hSpacing = (uint32_t)options->pasp[0];
+        image->pasp.vSpacing = (uint32_t)options->pasp[1];
+        image->transformFlags |= AVIF_TRANSFORM_PASP;
+    }
+
+    // Crop rectangle - convert to clap
+    if (options->crop[0] >= 0) {
+        avifCropRect cropRect;
+        cropRect.x = (uint32_t)options->crop[0];
+        cropRect.y = (uint32_t)options->crop[1];
+        cropRect.width = (uint32_t)options->crop[2];
+        cropRect.height = (uint32_t)options->crop[3];
+
+        avifDiagnostics diag;
+        avifDiagnosticsClearError(&diag);
+
+        avifBool convertResult = avifCleanApertureBoxFromCropRect(
+            &image->clap,
+            &cropRect,
+            picture.width,
+            picture.height,
+            &diag
+        );
+
+        if (!convertResult) {
+            avifRGBImageFreePixels(&rgb);
+            avifImageDestroy(image);
+            WebPPictureFree(&picture);
+            nextimage_set_error("Failed to convert crop rect to clap: %s", diag.error);
+            return NEXTIMAGE_ERROR_ENCODE_FAILED;
+        }
+        image->transformFlags |= AVIF_TRANSFORM_CLAP;
+    }
+    // Clean aperture (clap) - direct values
+    else if (options->clap[0] >= 0) {
+        image->clap.widthN = (uint32_t)options->clap[0];
+        image->clap.widthD = (uint32_t)options->clap[1];
+        image->clap.heightN = (uint32_t)options->clap[2];
+        image->clap.heightD = (uint32_t)options->clap[3];
+        image->clap.horizOffN = (uint32_t)options->clap[4];
+        image->clap.horizOffD = (uint32_t)options->clap[5];
+        image->clap.vertOffN = (uint32_t)options->clap[6];
+        image->clap.vertOffD = (uint32_t)options->clap[7];
+        image->transformFlags |= AVIF_TRANSFORM_CLAP;
+    }
+
+    // Content light level information (clli)
+    if (options->clli_max_cll >= 0 || options->clli_max_pall >= 0) {
+        image->clli.maxCLL = (options->clli_max_cll >= 0) ? (uint16_t)options->clli_max_cll : 0;
+        image->clli.maxPALL = (options->clli_max_pall >= 0) ? (uint16_t)options->clli_max_pall : 0;
+    }
+
     // Create encoder
     avifEncoder* encoder = avifEncoderCreate();
     if (!encoder) {
@@ -180,16 +429,65 @@ NextImageStatus nextimage_avif_encode_alloc(
 
     // Set encoder options
     encoder->speed = options->speed;
-    encoder->minQuantizer = options->quality > 0 ? quality_to_quantizer(options->quality) : options->min_quantizer;
-    encoder->maxQuantizer = options->quality > 0 ? quality_to_quantizer(options->quality) : options->max_quantizer;
-    encoder->minQuantizerAlpha = options->min_quantizer_alpha;
-    encoder->maxQuantizerAlpha = options->max_quantizer_alpha;
+
+    // Set maxThreads to match avifenc default (CPU count for -j all)
+    // avifenc v1.3.0 uses avifQueryCPUCount() when jobs == -1 (default)
+    encoder->maxThreads = queryCPUCount();
+
+    // Quality settings (color/YUV)
+    if (options->min_quantizer >= 0 && options->max_quantizer >= 0) {
+        // Deprecated: use quantizers directly for backward compatibility
+        encoder->minQuantizer = options->min_quantizer;
+        encoder->maxQuantizer = options->max_quantizer;
+    } else {
+        // Use quality setting (0-100) - this is the recommended approach
+        encoder->quality = options->quality;
+    }
+
+    // Quality settings (alpha)
+    int quality_alpha = (options->quality_alpha >= 0) ? options->quality_alpha : options->quality;
+    if (options->min_quantizer_alpha >= 0 && options->max_quantizer_alpha >= 0) {
+        // Deprecated: use quantizers directly for backward compatibility
+        encoder->minQuantizerAlpha = options->min_quantizer_alpha;
+        encoder->maxQuantizerAlpha = options->max_quantizer_alpha;
+    } else {
+        // Use qualityAlpha setting (0-100)
+        encoder->qualityAlpha = quality_alpha;
+    }
+
+    // Tiling settings
     encoder->tileRowsLog2 = options->tile_rows_log2;
     encoder->tileColsLog2 = options->tile_cols_log2;
 
-    // Encode
+    // avifenc v1.3.0 starts in automatic tiling mode by default (commit 1894a21d, 2025-04-11)
+    // This automatically determines optimal tile configuration based on image dimensions
+    // Disable autoTiling if manual tiling is specified
+    if (options->tile_rows_log2 > 0 || options->tile_cols_log2 > 0) {
+        encoder->autoTiling = AVIF_FALSE;
+    } else {
+        encoder->autoTiling = AVIF_TRUE;
+    }
+
+    // Animation settings (for future use)
+    if (options->timescale > 0) {
+        encoder->timescale = options->timescale;
+    }
+    if (options->keyframe_interval > 0) {
+        encoder->keyframeInterval = options->keyframe_interval;
+    }
+
+    // Encode using avifEncoderAddImage + avifEncoderFinish
+    // (matching avifenc.c implementation, lines 1244-1287)
+    result = avifEncoderAddImage(encoder, image, 1, AVIF_ADD_IMAGE_FLAG_SINGLE);
+    if (result != AVIF_RESULT_OK) {
+        avifEncoderDestroy(encoder);
+        avifImageDestroy(image);
+        nextimage_set_error("AVIF add image failed: %s", avifResultToString(result));
+        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    }
+
     avifRWData raw = AVIF_DATA_EMPTY;
-    result = avifEncoderWrite(encoder, image, &raw);
+    result = avifEncoderFinish(encoder, &raw);
     if (result != AVIF_RESULT_OK) {
         avifEncoderDestroy(encoder);
         avifImageDestroy(image);

@@ -294,3 +294,35 @@ func TestAVIFDecoderInstance(t *testing.T) {
 
 	t.Logf("Decoded AVIF: %dx%d, %d bytes", decoded.Width, decoded.Height, len(decoded.Data))
 }
+
+func TestWebP2GIFIntegration(t *testing.T) {
+	// Encode JPEG to WebP
+	jpegData, err := os.ReadFile("../testdata/jpeg/test.jpg")
+	if err != nil {
+		t.Fatalf("Failed to read JPEG file: %v", err)
+	}
+
+	encOpts := DefaultWebPEncodeOptions()
+	encOpts.Quality = 85
+
+	webpData, err := WebPEncodeBytes(jpegData, encOpts)
+	if err != nil {
+		t.Fatalf("WebP encode failed: %v", err)
+	}
+	t.Logf("Encoded to WebP: %d bytes", len(webpData))
+
+	// Convert WebP to GIF
+	gifData, err := WebP2GIFConvertBytes(webpData)
+	if err != nil {
+		t.Fatalf("WebP to GIF conversion failed: %v", err)
+	}
+
+	if len(gifData) == 0 {
+		t.Fatal("GIF data is empty")
+	}
+
+	t.Logf("Converted to GIF: %d bytes (256-color quantized)", len(gifData))
+
+	// Optionally save for manual inspection
+	_ = os.WriteFile("/tmp/test_integration_webp2gif.gif", gifData, 0644)
+}

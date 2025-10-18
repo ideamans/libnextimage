@@ -3,10 +3,18 @@ package libnextimage
 /*
 #cgo CFLAGS: -I${SRCDIR}/../c/include
 
-// macOS ARM64: Link to combined static library in lib/darwin-arm64
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
-#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a -lz
-#cgo darwin,arm64 LDFLAGS: -framework CoreFoundation
+// macOS ARM64: Link to static libraries in c/build
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libnextimage.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebp.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libsharpyuv.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebpdemux.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebpmux.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libimageioutil.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libimagedec.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libavif/libavif_internal.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/_deps/aom-build/libaom.a
+#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a /opt/homebrew/lib/libgif.a -lz
+#cgo darwin,arm64 LDFLAGS: -lc++ -framework CoreFoundation
 
 // macOS Intel: Link to combined static library in lib/darwin-amd64
 #cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage

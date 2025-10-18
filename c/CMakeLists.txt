@@ -39,6 +39,7 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # libwebp のビルド
 # imagedec/imageenc ライブラリを使用するため ANIM_UTILS を ON にする
+# WebPAnimEncoder を使用するため WEBP_BUILD_LIBWEBPMUX を ON にする
 set(WEBP_BUILD_ANIM_UTILS ON CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_DWEBP OFF CACHE BOOL "" FORCE)
@@ -49,7 +50,7 @@ set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
 set(WEBP_ENABLE_SIMD ON CACHE BOOL "" FORCE)
-set(WEBP_BUILD_LIBWEBPMUX OFF CACHE BOOL "" FORCE)
+set(WEBP_BUILD_LIBWEBPMUX ON CACHE BOOL "" FORCE)
 # インストールを無効化（libnextimage.aに統合するため）
 set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp ${CMAKE_CURRENT_BINARY_DIR}/libwebp EXCLUDE_FROM_ALL)
@@ -72,6 +73,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/examples
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libavif/include
 )
 
@@ -80,6 +82,7 @@ set(SOURCES
     src/common.c
     src/webp.c
     src/avif.c
+    ../deps/libwebp/examples/gifdec.c
 )
 
 # 静的ライブラリのビルド
@@ -90,9 +93,28 @@ target_include_directories(nextimage PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
 )
 
+# GIF support を有効化（gifdec.c で使用）
+target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
+
+# giflib のパスを探す
+find_library(GIF_LIBRARY NAMES gif PATHS /opt/homebrew/lib /usr/local/lib /usr/lib)
+find_path(GIF_INCLUDE_DIR gif_lib.h PATHS /opt/homebrew/include /usr/local/include /usr/include)
+
+if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
+    message(STATUS "Found giflib: ${GIF_LIBRARY}")
+    target_include_directories(nextimage PRIVATE ${GIF_INCLUDE_DIR})
+else()
+    message(WARNING "giflib not found - WebP to GIF conversion will not be available")
+endif()
+
 # libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
-# webp, webpdemux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる
-target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv imagedec imageenc avif)
+# webp, webpdemux, webpmux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる
+target_link_libraries(nextimage PUBLIC webp webpdemux libwebpmux sharpyuv imagedec imageenc avif)
+
+# giflib をリンク（見つかった場合）
+if(GIF_LIBRARY)
+    target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
+endif()
 
 # コンパイラ警告の有効化
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
