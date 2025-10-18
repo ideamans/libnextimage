@@ -2,8 +2,30 @@ package libnextimage
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../c/include
-#cgo LDFLAGS: -L${SRCDIR}/../c/build -lnextimage -L${SRCDIR}/../c/build/libwebp -lwebp -lwebpdemux -lsharpyuv
-#cgo darwin LDFLAGS: -framework CoreFoundation
+
+// macOS ARM64: Link to combined static library in lib/darwin-arm64
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
+#cgo darwin,arm64 LDFLAGS: -framework CoreFoundation
+
+// macOS Intel: Link to combined static library in lib/darwin-amd64
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage
+#cgo darwin,amd64 LDFLAGS: -framework CoreFoundation
+
+// Linux x64: Link to combined static library in lib/linux-amd64
+#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage
+#cgo linux,amd64 LDFLAGS: -lpthread -lm -ldl
+
+// Linux ARM64: Link to combined static library in lib/linux-arm64
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage
+#cgo linux,arm64 LDFLAGS: -lpthread -lm -ldl
+
+// Windows x64: Link to combined static library in lib/windows-amd64
+#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage
+#cgo windows,amd64 LDFLAGS: -lws2_32 -lkernel32 -luser32
+
+// Other platforms: Link to combined static library in lib/other
+#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other -lnextimage
+#cgo !darwin,!linux,!windows LDFLAGS: -lpthread -lm
 
 #include "nextimage.h"
 #include "webp.h"

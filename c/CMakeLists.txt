@@ -47,7 +47,11 @@ set(WEBP_BUILD_VWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp ${CMAKE_CURRENT_BINARY_DIR}/libwebp)
+set(WEBP_ENABLE_SIMD ON CACHE BOOL "" FORCE)
+set(WEBP_BUILD_LIBWEBPMUX OFF CACHE BOOL "" FORCE)
+# インストールを無効化（libnextimage.aに統合するため）
+set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY ON CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp ${CMAKE_CURRENT_BINARY_DIR}/libwebp EXCLUDE_FROM_ALL)
 
 # インクルードディレクトリ
 include_directories(
@@ -65,8 +69,9 @@ set(SOURCES
 # 静的ライブラリのビルド
 add_library(nextimage STATIC ${SOURCES})
 
-# libwebp のリンク
-target_link_libraries(nextimage PRIVATE webp webpdemux)
+# libwebp のリンク - Goからはこのライブラリのみをリンクすれば良いように
+# webp, webpdemux, sharpyuvを内部依存として持たせる
+target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv)
 
 # コンパイラ警告の有効化
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -100,12 +105,59 @@ if(ENABLE_UBSAN)
 endif()
 
 # インストール設定
-install(TARGETS nextimage
-    ARCHIVE DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}
-)
+# 複数の静的ライブラリを結合してlibnextimage.aに統合
+install(CODE "
+    message(STATUS \"Combining static libraries into libnextimage.a...\")
+
+    set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
+    file(MAKE_DIRECTORY \"\${LIB_DIR}\")
+
+    # Temporary directory for extraction
+    set(TEMP_DIR \"\${CMAKE_CURRENT_BINARY_DIR}/temp_combine\")
+    file(REMOVE_RECURSE \"\${TEMP_DIR}\")
+    file(MAKE_DIRECTORY \"\${TEMP_DIR}\")
+
+    # Extract all object files from each library
+    execute_process(
+        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
+        WORKING_DIRECTORY \"\${TEMP_DIR}\"
+    )
+    execute_process(
+        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
+        WORKING_DIRECTORY \"\${TEMP_DIR}\"
+    )
+    execute_process(
+        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
+        WORKING_DIRECTORY \"\${TEMP_DIR}\"
+    )
+    execute_process(
+        COMMAND ar -x \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
+        WORKING_DIRECTORY \"\${TEMP_DIR}\"
+    )
+
+    # Get all object files
+    file(GLOB OBJ_FILES \"\${TEMP_DIR}/*.o\")
+
+    # Create combined library
+    execute_process(
+        COMMAND ar -qc \"\${LIB_DIR}/libnextimage.a\" \${OBJ_FILES}
+        WORKING_DIRECTORY \"\${TEMP_DIR}\"
+    )
+
+    # Run ranlib
+    execute_process(
+        COMMAND ranlib \"\${LIB_DIR}/libnextimage.a\"
+    )
+
+    # Cleanup
+    file(REMOVE_RECURSE \"\${TEMP_DIR}\")
+
+    message(STATUS \"Combined library installed to: \${LIB_DIR}/libnextimage.a\")
+")
 
 install(FILES
     include/nextimage.h
+    include/webp.h
     DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
