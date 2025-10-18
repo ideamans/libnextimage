@@ -7,6 +7,7 @@ package libnextimage
 import "C"
 import (
 	"fmt"
+	"os"
 	"unsafe"
 )
 
@@ -109,21 +110,17 @@ func (opts *AVIFDecodeOptions) toCDecodeOptions() C.NextImageAVIFDecodeOptions {
 	return copts
 }
 
-// AVIFEncodeBytes encodes RGBA/RGB/BGRA image data to AVIF format
+// AVIFEncodeBytes encodes image file data (JPEG, PNG, etc.) to AVIF format
+// This is equivalent to the avifenc command-line tool.
+// The input data should be a complete image file (JPEG, PNG, etc.) not raw pixel data.
 func AVIFEncodeBytes(
-	inputData []byte,
-	width, height int,
-	format PixelFormat,
+	imageFileData []byte,
 	options AVIFEncodeOptions,
 ) ([]byte, error) {
 	clearError()
 
-	if len(inputData) == 0 {
+	if len(imageFileData) == 0 {
 		return nil, fmt.Errorf("avif encode: empty input data")
-	}
-
-	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("avif encode: invalid dimensions %dx%d", width, height)
 	}
 
 	// Convert options
@@ -132,11 +129,8 @@ func AVIFEncodeBytes(
 	// Encode
 	var output C.NextImageEncodeBuffer
 	status := C.nextimage_avif_encode_alloc(
-		(*C.uint8_t)(unsafe.Pointer(&inputData[0])),
-		C.size_t(len(inputData)),
-		C.int(width),
-		C.int(height),
-		C.NextImagePixelFormat(format),
+		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
+		C.size_t(len(imageFileData)),
 		&copts,
 		&output,
 	)
@@ -152,6 +146,18 @@ func AVIFEncodeBytes(
 	freeEncodeBuffer(&output)
 
 	return result, nil
+}
+
+// AVIFEncodeFile encodes an image file to AVIF format
+// This reads the image file (JPEG, PNG, etc.) and converts it to AVIF.
+func AVIFEncodeFile(inputPath string, options AVIFEncodeOptions) ([]byte, error) {
+	// Read input file
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return nil, fmt.Errorf("avif encode file: %w", err)
+	}
+
+	return AVIFEncodeBytes(data, options)
 }
 
 // AVIFDecodeBytes decodes AVIF data to RGBA/RGB/BGRA format

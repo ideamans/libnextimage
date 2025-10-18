@@ -121,26 +121,23 @@ func convertDecodeOptions(opts WebPDecodeOptions) C.NextImageWebPDecodeOptions {
 	return cOpts
 }
 
-// WebPEncodeBytes encodes pixel data to WebP format
-func WebPEncodeBytes(data []byte, width, height int, format PixelFormat, opts WebPEncodeOptions) ([]byte, error) {
+// WebPEncodeBytes encodes image file data (JPEG, PNG, GIF, etc.) to WebP format
+// This is equivalent to the cwebp command-line tool.
+// The input data should be a complete image file (JPEG, PNG, GIF, TIFF, WebP, etc.)
+// not raw pixel data.
+func WebPEncodeBytes(imageFileData []byte, opts WebPEncodeOptions) ([]byte, error) {
 	clearError()
 
-	if len(data) == 0 {
+	if len(imageFileData) == 0 {
 		return nil, fmt.Errorf("webp encode: empty input data")
-	}
-	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("webp encode: invalid dimensions %dx%d", width, height)
 	}
 
 	cOpts := convertEncodeOptions(opts)
 	var encoded C.NextImageEncodeBuffer
 
 	status := C.nextimage_webp_encode_alloc(
-		(*C.uint8_t)(unsafe.Pointer(&data[0])),
-		C.size_t(len(data)),
-		C.int(width),
-		C.int(height),
-		C.NextImagePixelFormat(format),
+		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
+		C.size_t(len(imageFileData)),
 		&cOpts,
 		&encoded,
 	)
@@ -159,12 +156,15 @@ func WebPEncodeBytes(data []byte, width, height int, format PixelFormat, opts We
 }
 
 // WebPEncodeFile encodes an image file to WebP format
+// This reads the image file (JPEG, PNG, GIF, etc.) and converts it to WebP.
 func WebPEncodeFile(inputPath string, opts WebPEncodeOptions) ([]byte, error) {
-	// For now, not implemented - requires image decoding to get width, height, format
-	// Users should use WebPEncodeBytes with decoded image data
-	_ = inputPath
-	_ = opts
-	return nil, fmt.Errorf("webp encode file: not yet implemented - use WebPEncodeBytes with decoded image data")
+	// Read input file
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return nil, fmt.Errorf("webp encode file: %w", err)
+	}
+
+	return WebPEncodeBytes(data, opts)
 }
 
 // WebPDecodeBytes decodes WebP data to pixel data

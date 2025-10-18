@@ -442,3 +442,100 @@ NextImageStatus nextimage_avif_decode_into(
 
     return NEXTIMAGE_OK;
 }
+
+// ========================================
+// インスタンスベースのエンコーダー/デコーダー
+// ========================================
+
+// エンコーダー構造体
+struct NextImageAVIFEncoder {
+    NextImageAVIFEncodeOptions options;
+};
+
+// デコーダー構造体
+struct NextImageAVIFDecoder {
+    NextImageAVIFDecodeOptions options;
+};
+
+// エンコーダーの作成
+NextImageAVIFEncoder* nextimage_avif_encoder_create(
+    const NextImageAVIFEncodeOptions* options
+) {
+    NextImageAVIFEncoder* encoder = (NextImageAVIFEncoder*)nextimage_malloc(sizeof(NextImageAVIFEncoder));
+    if (!encoder) {
+        nextimage_set_error("Failed to allocate encoder");
+        return NULL;
+    }
+
+    // オプションをコピー
+    if (options) {
+        encoder->options = *options;
+    } else {
+        nextimage_avif_default_encode_options(&encoder->options);
+    }
+
+    return encoder;
+}
+
+// エンコーダーでエンコード
+NextImageStatus nextimage_avif_encoder_encode(
+    NextImageAVIFEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output
+) {
+    if (!encoder) {
+        nextimage_set_error("Invalid encoder instance");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_avif_encode_alloc(input_data, input_size, &encoder->options, output);
+}
+
+// エンコーダーの破棄
+void nextimage_avif_encoder_destroy(NextImageAVIFEncoder* encoder) {
+    if (encoder) {
+        nextimage_free(encoder);
+    }
+}
+
+// デコーダーの作成
+NextImageAVIFDecoder* nextimage_avif_decoder_create(
+    const NextImageAVIFDecodeOptions* options
+) {
+    NextImageAVIFDecoder* decoder = (NextImageAVIFDecoder*)nextimage_malloc(sizeof(NextImageAVIFDecoder));
+    if (!decoder) {
+        nextimage_set_error("Failed to allocate decoder");
+        return NULL;
+    }
+
+    if (options) {
+        decoder->options = *options;
+    } else {
+        nextimage_avif_default_decode_options(&decoder->options);
+    }
+
+    return decoder;
+}
+
+// デコーダーでデコード
+NextImageStatus nextimage_avif_decoder_decode(
+    NextImageAVIFDecoder* decoder,
+    const uint8_t* avif_data,
+    size_t avif_size,
+    NextImageDecodeBuffer* output
+) {
+    if (!decoder) {
+        nextimage_set_error("Invalid decoder instance");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_avif_decode_alloc(avif_data, avif_size, &decoder->options, output);
+}
+
+// デコーダーの破棄
+void nextimage_avif_decoder_destroy(NextImageAVIFDecoder* decoder) {
+    if (decoder) {
+        nextimage_free(decoder);
+    }
+}

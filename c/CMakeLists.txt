@@ -145,7 +145,6 @@ install(CODE "
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libexampleutil.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
         )
@@ -160,7 +159,6 @@ install(CODE "
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libexampleutil.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"SAVE\\nEND\\n\")
