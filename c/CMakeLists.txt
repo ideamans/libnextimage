@@ -38,7 +38,8 @@ message(STATUS "Platform: ${PLATFORM}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # libwebp のビルド
-set(WEBP_BUILD_ANIM_UTILS OFF CACHE BOOL "" FORCE)
+# imagedec/imageenc ライブラリを使用するため ANIM_UTILS を ON にする
+set(WEBP_BUILD_ANIM_UTILS ON CACHE BOOL "" FORCE)
 set(WEBP_BUILD_CWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_DWEBP OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_GIF2WEBP OFF CACHE BOOL "" FORCE)
@@ -84,8 +85,8 @@ set(SOURCES
 add_library(nextimage STATIC ${SOURCES})
 
 # libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
-# webp, webpdemux, sharpyuv, avif を内部依存として持たせる
-target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv avif)
+# webp, webpdemux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる
+target_link_libraries(nextimage PUBLIC webp webpdemux sharpyuv imagedec imageenc avif)
 
 # コンパイラ警告の有効化
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
@@ -135,6 +136,10 @@ install(CODE "
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libexampleutil.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
         )
@@ -146,6 +151,10 @@ install(CODE "
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libexampleutil.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"SAVE\\nEND\\n\")

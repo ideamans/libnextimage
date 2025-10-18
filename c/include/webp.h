@@ -40,18 +40,14 @@ void nextimage_webp_default_decode_options(NextImageWebPDecodeOptions* options);
 // ========================================
 
 // エンコード（ライブラリがメモリを割り当て）
-// input_data: RGBA/RGB/BGRAピクセルデータ
+// input_data: 画像ファイルデータ（JPEG, PNG, GIF等のバイトデータ）
 // input_size: データサイズ（バイト単位）
-// width, height: 画像サイズ
-// input_format: 入力ピクセルフォーマット
 // options: エンコードオプション（NULLでデフォルト）
 // output: 出力バッファ（成功時にdataとsizeが設定される）
+// 注: 画像フォーマットは自動判定されます
 NextImageStatus nextimage_webp_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
-    int width,
-    int height,
-    NextImagePixelFormat input_format,
     const NextImageWebPEncodeOptions* options,
     NextImageEncodeBuffer* output
 );
@@ -122,6 +118,56 @@ NextImageStatus nextimage_webp2gif_alloc(
     size_t webp_size,
     NextImageEncodeBuffer* output
 );
+
+// ========================================
+// インスタンスベースのエンコーダー/デコーダー
+// ========================================
+
+// WebPエンコーダーインスタンス（不透明な構造体）
+typedef struct NextImageWebPEncoder NextImageWebPEncoder;
+
+// エンコーダーの作成（libwebpの初期化を含む）
+// options: エンコードオプション（NULLでデフォルト）
+// 戻り値: エンコーダーインスタンス（失敗時はNULL）
+NextImageWebPEncoder* nextimage_webp_encoder_create(
+    const NextImageWebPEncodeOptions* options);
+
+// エンコーダーでエンコード（繰り返し呼び出し可能）
+// encoder: エンコーダーインスタンス
+// input_data: 画像ファイルデータ（JPEG, PNG等）
+// input_size: データサイズ
+// output: 出力バッファ（成功時にWebPデータが設定される）
+NextImageStatus nextimage_webp_encoder_encode(
+    NextImageWebPEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output);
+
+// エンコーダーの破棄（内部メモリの解放）
+void nextimage_webp_encoder_destroy(NextImageWebPEncoder* encoder);
+
+// WebPデコーダーインスタンス（不透明な構造体）
+typedef struct NextImageWebPDecoder NextImageWebPDecoder;
+
+// デコーダーの作成
+// options: デコードオプション（NULLでデフォルト）
+// 戻り値: デコーダーインスタンス（失敗時はNULL）
+NextImageWebPDecoder* nextimage_webp_decoder_create(
+    const NextImageWebPDecodeOptions* options);
+
+// デコーダーでデコード（繰り返し呼び出し可能）
+// decoder: デコーダーインスタンス
+// webp_data: WebPファイルデータ
+// webp_size: データサイズ
+// output: 出力バッファ（成功時にピクセルデータとメタデータが設定される）
+NextImageStatus nextimage_webp_decoder_decode(
+    NextImageWebPDecoder* decoder,
+    const uint8_t* webp_data,
+    size_t webp_size,
+    NextImageDecodeBuffer* output);
+
+// デコーダーの破棄（内部メモリの解放）
+void nextimage_webp_decoder_destroy(NextImageWebPDecoder* decoder);
 
 #ifdef __cplusplus
 }

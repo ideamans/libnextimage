@@ -39,18 +39,14 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options);
 // ========================================
 
 // エンコード（ライブラリがメモリを割り当て）
-// input_data: RGBA/RGB/BGRAピクセルデータ、またはYUVプレーンデータ
+// input_data: 画像ファイルデータ（JPEG, PNG等のバイトデータ）
 // input_size: データサイズ（バイト単位）
-// width, height: 画像サイズ
-// input_format: 入力ピクセルフォーマット
 // options: エンコードオプション（NULLでデフォルト）
 // output: 出力バッファ（成功時にdataとsizeが設定される）
+// 注: 画像フォーマットは自動判定されます
 NextImageStatus nextimage_avif_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
-    int width,
-    int height,
-    NextImagePixelFormat input_format,
     const NextImageAVIFEncodeOptions* options,
     NextImageEncodeBuffer* output
 );
@@ -92,6 +88,56 @@ NextImageStatus nextimage_avif_decode_size(
     int* bit_depth,
     size_t* required_size
 );
+
+// ========================================
+// インスタンスベースのエンコーダー/デコーダー
+// ========================================
+
+// AVIFエンコーダーインスタンス（不透明な構造体）
+typedef struct NextImageAVIFEncoder NextImageAVIFEncoder;
+
+// エンコーダーの作成（libavifの初期化を含む）
+// options: エンコードオプション（NULLでデフォルト）
+// 戻り値: エンコーダーインスタンス（失敗時はNULL）
+NextImageAVIFEncoder* nextimage_avif_encoder_create(
+    const NextImageAVIFEncodeOptions* options);
+
+// エンコーダーでエンコード（繰り返し呼び出し可能）
+// encoder: エンコーダーインスタンス
+// input_data: 画像ファイルデータ（JPEG, PNG等）
+// input_size: データサイズ
+// output: 出力バッファ（成功時にAVIFデータが設定される）
+NextImageStatus nextimage_avif_encoder_encode(
+    NextImageAVIFEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output);
+
+// エンコーダーの破棄（内部メモリの解放）
+void nextimage_avif_encoder_destroy(NextImageAVIFEncoder* encoder);
+
+// AVIFデコーダーインスタンス（不透明な構造体）
+typedef struct NextImageAVIFDecoder NextImageAVIFDecoder;
+
+// デコーダーの作成
+// options: デコードオプション（NULLでデフォルト）
+// 戻り値: デコーダーインスタンス（失敗時はNULL）
+NextImageAVIFDecoder* nextimage_avif_decoder_create(
+    const NextImageAVIFDecodeOptions* options);
+
+// デコーダーでデコード（繰り返し呼び出し可能）
+// decoder: デコーダーインスタンス
+// avif_data: AVIFファイルデータ
+// avif_size: データサイズ
+// output: 出力バッファ（成功時にピクセルデータとメタデータが設定される）
+NextImageStatus nextimage_avif_decoder_decode(
+    NextImageAVIFDecoder* decoder,
+    const uint8_t* avif_data,
+    size_t avif_size,
+    NextImageDecodeBuffer* output);
+
+// デコーダーの破棄（内部メモリの解放）
+void nextimage_avif_decoder_destroy(NextImageAVIFDecoder* decoder);
 
 #ifdef __cplusplus
 }
