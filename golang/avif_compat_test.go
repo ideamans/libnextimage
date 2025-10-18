@@ -383,48 +383,88 @@ func TestCompat_AVIF_EncodeYUVFormat(t *testing.T) {
 func TestCompat_AVIF_Decode(t *testing.T) {
 	setupAVIFCompatTest(t)
 
-	// First create an AVIF file for testing
+	// First create an AVIF file with metadata for testing
 	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
 	opts := DefaultAVIFEncodeOptions()
 	opts.Quality = 75
+
+	// Add minimal metadata for testing ignore options
+	opts.ExifData = []byte{
+		'E', 'x', 'i', 'f', 0, 0, // Exif header
+		'I', 'I', 42, 0, 8, 0, 0, 0, // TIFF header
+		0, 0, // No IFD entries
+	}
+	opts.XMPData = []byte(`<?xml version="1.0"?><x:xmpmeta xmlns:x="adobe:ns:meta/"></x:xmpmeta>`)
+
 	avifData, err := AVIFEncodeFile(inputPath, opts)
 	if err != nil {
 		t.Fatalf("failed to create test AVIF: %v", err)
 	}
 
-	t.Run("decode-default", func(t *testing.T) {
-		t.Logf("Testing AVIF decoding: default options")
+	testCases := []struct {
+		name       string
+		ignoreExif bool
+		ignoreXMP  bool
+		ignoreICC  bool
+	}{
+		{
+			name:       "decode-default",
+			ignoreExif: false,
+			ignoreXMP:  false,
+			ignoreICC:  false,
+		},
+		{
+			name:       "decode-ignore-exif",
+			ignoreExif: true,
+			ignoreXMP:  false,
+			ignoreICC:  false,
+		},
+		{
+			name:       "decode-ignore-xmp",
+			ignoreExif: false,
+			ignoreXMP:  true,
+			ignoreICC:  false,
+		},
+		{
+			name:       "decode-ignore-icc",
+			ignoreExif: false,
+			ignoreXMP:  false,
+			ignoreICC:  true,
+		},
+		{
+			name:       "decode-ignore-all",
+			ignoreExif: true,
+			ignoreXMP:  true,
+			ignoreICC:  true,
+		},
+	}
 
-		// Run avifdec command
-		cmdOutput := runAVIFDec(t, avifData, []string{})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing AVIF decoding: %s", tc.name)
 
-		// Run library decoding
-		decOpts := DefaultAVIFDecodeOptions()
-		decoded, err := AVIFDecodeBytes(avifData, decOpts)
-		if err != nil {
-			t.Fatalf("library decoding failed: %v", err)
-		}
+			// Run library decoding with options
+			decOpts := DefaultAVIFDecodeOptions()
+			decOpts.IgnoreExif = tc.ignoreExif
+			decOpts.IgnoreXMP = tc.ignoreXMP
+			decOpts.IgnoreICC = tc.ignoreICC
 
-		// Save library output as PNG for comparison
-		tmpFile, err := os.CreateTemp("", "test-lib-*.png")
-		if err != nil {
-			t.Fatalf("failed to create temp file: %v", err)
-		}
-		defer os.Remove(tmpFile.Name())
+			decoded, err := AVIFDecodeBytes(avifData, decOpts)
+			if err != nil {
+				t.Fatalf("library decoding failed: %v", err)
+			}
 
-		// Use external tool to convert RGBA to PNG
-		// Since we don't have PNG encoding in this library, we'll just compare pixel data
-		t.Logf("  Decoded: %dx%d, %d bytes, format: %v",
-			decoded.Width, decoded.Height, len(decoded.Data), decoded.Format)
-		t.Logf("  Command output: %d bytes", len(cmdOutput))
+			t.Logf("  Decoded: %dx%d, %d bytes, format: %v",
+				decoded.Width, decoded.Height, len(decoded.Data), decoded.Format)
 
-		// For now, just verify decoding succeeded
-		if decoded.Width <= 0 || decoded.Height <= 0 || len(decoded.Data) == 0 {
-			t.Errorf("  ✗ FAILED: Invalid decoded image dimensions or data")
-		} else {
-			t.Logf("  ✓ PASSED: Decoding succeeded")
-		}
-	})
+			// Verify decoding succeeded with valid dimensions
+			if decoded.Width <= 0 || decoded.Height <= 0 || len(decoded.Data) == 0 {
+				t.Errorf("  ✗ FAILED: Invalid decoded image dimensions or data")
+			} else {
+				t.Logf("  ✓ PASSED: Decoding succeeded with ignore options")
+			}
+		})
+	}
 }
 
 // TestCompat_AVIF_RoundTrip tests encoding and decoding round trip
@@ -990,6 +1030,217 @@ func TestCompat_AVIF_Tiling(t *testing.T) {
 
 			// Compare outputs
 			compareAVIFOutputs(t, cmdOutput, libOutput)
+		})
+	}
+}
+
+// TestCompat_AVIF_Lossless tests AVIF lossless encoding
+func TestCompat_AVIF_Lossless(t *testing.T) {
+	setupAVIFCompatTest(t)
+
+	testCases := []struct {
+		name                string
+		quality             int
+		matrixCoefficients  int
+		args                []string
+	}{
+		{
+			name:               "lossless-flag",
+			quality:            100,
+			matrixCoefficients: 0, // Identity matrix for true lossless
+			args:               []string{"-l"},
+		},
+		{
+			name:               "lossless-quality-100-identity",
+			quality:            100,
+			matrixCoefficients: 0, // Identity matrix for true lossless
+			args:               []string{"-q", "100", "--cicp", "1/2/0"},
+		},
+	}
+
+	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing AVIF encoding: %s", tc.name)
+
+			// Run avifenc command
+			cmdOutput := runAVIFEnc(t, inputPath, tc.args)
+
+			// Run library encoding
+			opts := DefaultAVIFEncodeOptions()
+			opts.Quality = tc.quality
+			opts.MatrixCoefficients = tc.matrixCoefficients
+			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			if err != nil {
+				t.Fatalf("library encoding failed: %v", err)
+			}
+
+			// Compare outputs
+			compareAVIFOutputs(t, cmdOutput, libOutput)
+		})
+	}
+}
+
+// TestCompat_AVIF_PremultiplyAlpha tests AVIF encoding with premultiply alpha
+func TestCompat_AVIF_PremultiplyAlpha(t *testing.T) {
+	setupAVIFCompatTest(t)
+
+	testCases := []struct {
+		name             string
+		premultiplyAlpha bool
+		args             []string
+	}{
+		{
+			name:             "premultiply-enabled",
+			premultiplyAlpha: true,
+			args:             []string{"-p"},
+		},
+		{
+			name:             "premultiply-disabled",
+			premultiplyAlpha: false,
+			args:             []string{},
+		},
+	}
+
+	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing AVIF encoding: %s", tc.name)
+
+			// Run avifenc command
+			cmdOutput := runAVIFEnc(t, inputPath, tc.args)
+
+			// Run library encoding
+			opts := DefaultAVIFEncodeOptions()
+			opts.PremultiplyAlpha = tc.premultiplyAlpha
+			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			if err != nil {
+				t.Fatalf("library encoding failed: %v", err)
+			}
+
+			// Compare outputs
+			compareAVIFOutputs(t, cmdOutput, libOutput)
+		})
+	}
+}
+
+// TestCompat_AVIF_DecodeSecurityLimits tests AVIF decoding with security limits
+func TestCompat_AVIF_DecodeSecurityLimits(t *testing.T) {
+	setupAVIFCompatTest(t)
+
+	// Create a normal AVIF file for testing
+	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
+	opts := DefaultAVIFEncodeOptions()
+	opts.Quality = 75
+	avifData, err := AVIFEncodeFile(inputPath, opts)
+	if err != nil {
+		t.Fatalf("failed to create test AVIF: %v", err)
+	}
+
+	testCases := []struct {
+		name                string
+		imageSizeLimit      uint32
+		imageDimensionLimit uint32
+		shouldFail          bool
+	}{
+		{
+			name:                "size-limit-normal",
+			imageSizeLimit:      268435456, // default: 16384 x 16384
+			imageDimensionLimit: 32768,     // default
+			shouldFail:          false,
+		},
+		{
+			name:                "size-limit-too-small",
+			imageSizeLimit:      100000, // 512x512 = 262144 > 100000
+			imageDimensionLimit: 32768,
+			shouldFail:          true,
+		},
+		{
+			name:                "dimension-limit-too-small",
+			imageSizeLimit:      268435456,
+			imageDimensionLimit: 256, // 512 > 256
+			shouldFail:          true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing AVIF decoding: %s", tc.name)
+
+			decOpts := DefaultAVIFDecodeOptions()
+			decOpts.ImageSizeLimit = tc.imageSizeLimit
+			decOpts.ImageDimensionLimit = tc.imageDimensionLimit
+
+			decoded, err := AVIFDecodeBytes(avifData, decOpts)
+
+			if tc.shouldFail {
+				if err == nil {
+					t.Errorf("  ✗ FAILED: Expected decode to fail with limit, but it succeeded")
+				} else {
+					t.Logf("  ✓ PASSED: Decode correctly failed with limit: %v", err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("  ✗ FAILED: Decode failed unexpectedly: %v", err)
+				} else if decoded.Width <= 0 || decoded.Height <= 0 {
+					t.Errorf("  ✗ FAILED: Invalid decoded image")
+				} else {
+					t.Logf("  ✓ PASSED: Decode succeeded with limits")
+				}
+			}
+		})
+	}
+}
+
+// TestCompat_AVIF_DecodeStrictFlags tests AVIF decoding with strict validation flags
+func TestCompat_AVIF_DecodeStrictFlags(t *testing.T) {
+	setupAVIFCompatTest(t)
+
+	// Create a normal AVIF file for testing
+	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
+	opts := DefaultAVIFEncodeOptions()
+	opts.Quality = 75
+	avifData, err := AVIFEncodeFile(inputPath, opts)
+	if err != nil {
+		t.Fatalf("failed to create test AVIF: %v", err)
+	}
+
+	testCases := []struct {
+		name        string
+		strictFlags int
+	}{
+		{
+			name:        "strict-enabled",
+			strictFlags: 1, // AVIF_STRICT_ENABLED
+		},
+		{
+			name:        "strict-disabled",
+			strictFlags: 0, // AVIF_STRICT_DISABLED
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("Testing AVIF decoding: %s", tc.name)
+
+			decOpts := DefaultAVIFDecodeOptions()
+			decOpts.StrictFlags = tc.strictFlags
+
+			decoded, err := AVIFDecodeBytes(avifData, decOpts)
+			if err != nil {
+				t.Fatalf("library decoding failed: %v", err)
+			}
+
+			t.Logf("  Decoded: %dx%d, %d bytes, strict_flags=%d",
+				decoded.Width, decoded.Height, len(decoded.Data), tc.strictFlags)
+
+			if decoded.Width <= 0 || decoded.Height <= 0 || len(decoded.Data) == 0 {
+				t.Errorf("  ✗ FAILED: Invalid decoded image")
+			} else {
+				t.Logf("  ✓ PASSED: Decoding succeeded with strict_flags=%d", tc.strictFlags)
+			}
 		})
 	}
 }

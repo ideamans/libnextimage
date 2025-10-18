@@ -78,7 +78,9 @@ High-performance WebP and AVIF encoding/decoding library with FFI interface for 
   - **Total: 6/11 decoding tests passing (basic cases working)**
 - ⏳ AVIF compatibility testing
 
-## Usage Example (Go)
+## Usage Examples (Go)
+
+### WebP Encoding/Decoding
 
 ```go
 package main
@@ -126,6 +128,87 @@ func main() {
         decoded.Width, decoded.Height,
         decoded.Format, decoded.BitDepth)
 }
+```
+
+### AVIF Encoding with Advanced Options
+
+```go
+import "github.com/ideamans/libnextimage/golang"
+
+// Encode PNG to AVIF with high quality
+opts := libnextimage.DefaultAVIFEncodeOptions()
+opts.Quality = 90
+opts.Speed = 4
+opts.YUVFormat = 0  // 4:4:4 for best quality
+
+avifData, err := libnextimage.AVIFEncodeFile("input.png", opts)
+if err != nil {
+    panic(err)
+}
+
+os.WriteFile("output.avif", avifData, 0644)
+```
+
+### AVIF to PNG/JPEG Conversion
+
+```go
+import "github.com/ideamans/libnextimage/golang"
+
+// Convert AVIF to PNG with compression
+avifData, _ := os.ReadFile("input.avif")
+decOpts := libnextimage.DefaultAVIFDecodeOptions()
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBestQuality
+
+err := libnextimage.AVIFDecodeToPNG(
+    avifData,
+    "output.png",
+    decOpts,
+    9,  // PNG compression level (0-9, -1=default)
+)
+
+// Convert AVIF to JPEG
+err = libnextimage.AVIFDecodeToJPEG(
+    avifData,
+    "output.jpg",
+    decOpts,
+    90,  // JPEG quality (1-100)
+)
+
+// File-based conversion
+err = libnextimage.AVIFDecodeFileToPNG(
+    "input.avif",
+    "output.png",
+    decOpts,
+    -1,  // default compression
+)
+```
+
+### Chroma Upsampling Options
+
+```go
+import "github.com/ideamans/libnextimage/golang"
+
+decOpts := libnextimage.DefaultAVIFDecodeOptions()
+
+// Available upsampling modes:
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingAutomatic   // 0 (default)
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingFastest     // 1
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBestQuality // 2
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingNearest     // 3
+decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBilinear    // 4
+```
+
+### Security Limits for AVIF Decoding
+
+```go
+import "github.com/ideamans/libnextimage/golang"
+
+decOpts := libnextimage.DefaultAVIFDecodeOptions()
+decOpts.ImageSizeLimit = 100_000_000      // Max 100M pixels
+decOpts.ImageDimensionLimit = 16384       // Max 16384px width/height
+decOpts.StrictFlags = 1                   // Enable strict validation
+
+decoded, err := libnextimage.AVIFDecodeBytes(avifData, decOpts)
 ```
 
 ## Quick Start

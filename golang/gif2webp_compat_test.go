@@ -10,21 +10,18 @@ import (
 
 var gifTestdataDir = filepath.Join("..", "testdata", "gif-source")
 
-// NOTE: GIF to WebP conversion is currently not fully implemented.
-// WebP's image_dec.h (WebPGuessImageType) does not support GIF format.
-// The gif2webp command-line tool uses a different implementation that directly
-// reads GIF using giflib and converts frame-by-frame.
+// NOTE: GIF to WebP conversion is now fully implemented using WebPAnimEncoder.
+// The implementation uses giflib to read GIF frames and WebPAnimEncoder to create
+// animated WebP, matching the gif2webp command-line tool behavior.
 //
-// To implement gif2webp compatibility:
-// 1. Read GIF using giflib (already included)
-// 2. Convert each frame to WebP
-// 3. Use WebP mux API to create animated WebP
-//
-// For now, these tests are skipped.
+// Implementation details:
+// 1. Read GIF using giflib (via gifdec.c)
+// 2. Convert each frame to WebP using WebPAnimEncoder
+// 3. Handle frame timing, transparency, and dispose methods
+// 4. Support all animation options (mixed, min_size, kmin, kmax, loop_compatibility)
 
 // gif2webp 互換性テスト - 静止画GIF
 func TestGIF2WebPCompat_Static(t *testing.T) {
-	t.Skip("GIF to WebP conversion not yet implemented - WebPGuessImageType does not support GIF format")
 	setupDecodeCompatTest(t)
 
 	testCases := []struct {
@@ -75,7 +72,6 @@ func TestGIF2WebPCompat_Static(t *testing.T) {
 
 // gif2webp 互換性テスト - アニメーションGIF
 func TestGIF2WebPCompat_Animated(t *testing.T) {
-	t.Skip("GIF to WebP conversion not yet implemented")
 	setupDecodeCompatTest(t)
 
 	testCases := []struct {
@@ -114,7 +110,6 @@ func TestGIF2WebPCompat_Animated(t *testing.T) {
 
 // gif2webp 互換性テスト - 透過GIF
 func TestGIF2WebPCompat_Alpha(t *testing.T) {
-	t.Skip("GIF to WebP conversion not yet implemented")
 	setupDecodeCompatTest(t)
 
 	testCases := []struct {
@@ -153,7 +148,6 @@ func TestGIF2WebPCompat_Alpha(t *testing.T) {
 
 // gif2webp 互換性テスト - 品質設定
 func TestGIF2WebPCompat_Quality(t *testing.T) {
-	t.Skip("GIF to WebP conversion not yet implemented")
 	setupDecodeCompatTest(t)
 
 	testCases := []struct {
@@ -200,7 +194,6 @@ func TestGIF2WebPCompat_Quality(t *testing.T) {
 
 // gif2webp 互換性テスト - メソッド設定
 func TestGIF2WebPCompat_Method(t *testing.T) {
-	t.Skip("GIF to WebP conversion not yet implemented")
 	setupDecodeCompatTest(t)
 
 	testCases := []struct {
@@ -295,7 +288,7 @@ func gif2webpWithLibrary(t *testing.T, gifFile string, opts WebPEncodeOptions) [
 }
 
 // Helper: gif2webpの出力を比較
-func compareGIF2WebPOutputs(t *testing.T, _ string, cmdOutput, libOutput []byte) {
+func compareGIF2WebPOutputs(t *testing.T, name string, cmdOutput, libOutput []byte) {
 	t.Helper()
 
 	cmdSize := len(cmdOutput)
@@ -303,6 +296,10 @@ func compareGIF2WebPOutputs(t *testing.T, _ string, cmdOutput, libOutput []byte)
 
 	t.Logf("  gif2webp: %d bytes", cmdSize)
 	t.Logf("  library:  %d bytes", libSize)
+
+	// Save outputs for debugging
+	os.WriteFile("/tmp/cmd_"+name+".webp", cmdOutput, 0644)
+	os.WriteFile("/tmp/lib_"+name+".webp", libOutput, 0644)
 
 	// バイナリ完全一致チェック
 	if bytes.Equal(cmdOutput, libOutput) {

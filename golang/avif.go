@@ -74,12 +74,34 @@ type AVIFEncodeOptions struct {
 	KeyframeInterval int // Max keyframe interval (default: 0=disabled)
 }
 
+// ChromaUpsampling represents chroma upsampling mode for YUV to RGB conversion
+type ChromaUpsampling int
+
+const (
+	ChromaUpsamplingAutomatic  ChromaUpsampling = 0 // Automatic (default)
+	ChromaUpsamplingFastest    ChromaUpsampling = 1 // Fastest (nearest neighbor)
+	ChromaUpsamplingBestQuality ChromaUpsampling = 2 // Best quality (bilinear)
+	ChromaUpsamplingNearest    ChromaUpsampling = 3 // Nearest neighbor
+	ChromaUpsamplingBilinear   ChromaUpsampling = 4 // Bilinear
+)
+
 // AVIFDecodeOptions represents AVIF decoding options
 type AVIFDecodeOptions struct {
 	UseThreads bool
 	Format     PixelFormat
 	IgnoreExif bool
 	IgnoreXMP  bool
+	IgnoreICC  bool
+
+	// Security limits
+	ImageSizeLimit      uint32 // Maximum image size in total pixels (default: 268435456)
+	ImageDimensionLimit uint32 // Maximum image dimension (width or height), 0=ignore (default: 32768)
+
+	// Validation flags
+	StrictFlags int // Strict validation flags: 0=disabled, 1=enabled (default: 1)
+
+	// Chroma upsampling (for YUV to RGB conversion)
+	ChromaUpsampling ChromaUpsampling // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
 }
 
 // DefaultAVIFEncodeOptions returns default AVIF encoding options
@@ -124,10 +146,15 @@ func DefaultAVIFDecodeOptions() AVIFDecodeOptions {
 	C.nextimage_avif_default_decode_options(&opts)
 
 	return AVIFDecodeOptions{
-		UseThreads: opts.use_threads != 0,
-		Format:     PixelFormat(opts.format),
-		IgnoreExif: opts.ignore_exif != 0,
-		IgnoreXMP:  opts.ignore_xmp != 0,
+		UseThreads:          opts.use_threads != 0,
+		Format:              PixelFormat(opts.format),
+		IgnoreExif:          opts.ignore_exif != 0,
+		IgnoreXMP:           opts.ignore_xmp != 0,
+		IgnoreICC:           opts.ignore_icc != 0,
+		ImageSizeLimit:      uint32(opts.image_size_limit),
+		ImageDimensionLimit: uint32(opts.image_dimension_limit),
+		StrictFlags:         int(opts.strict_flags),
+		ChromaUpsampling:    ChromaUpsampling(opts.chroma_upsampling),
 	}
 }
 
@@ -231,6 +258,22 @@ func (opts *AVIFDecodeOptions) toCDecodeOptions() C.NextImageAVIFDecodeOptions {
 	} else {
 		copts.ignore_xmp = 0
 	}
+	if opts.IgnoreICC {
+		copts.ignore_icc = 1
+	} else {
+		copts.ignore_icc = 0
+	}
+
+	// Security limits
+	copts.image_size_limit = C.uint32_t(opts.ImageSizeLimit)
+	copts.image_dimension_limit = C.uint32_t(opts.ImageDimensionLimit)
+
+	// Validation flags
+	copts.strict_flags = C.int(opts.StrictFlags)
+
+	// Chroma upsampling
+	copts.chroma_upsampling = C.int(opts.ChromaUpsampling)
+
 	return copts
 }
 

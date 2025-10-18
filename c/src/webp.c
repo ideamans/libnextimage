@@ -835,6 +835,11 @@ NextImageStatus nextimage_gif2webp_alloc(
         goto End;
     }
 
+    // gif2webp uses lossless encoding by default (unless -lossy or -mixed is specified)
+    // Since we don't have allow_mixed yet and can't distinguish user-set vs default lossless,
+    // we always use lossless for GIF inputs to match gif2webp behavior
+    config.lossless = 1;
+
     // Initialize animation encoder options
     if (!WebPAnimEncoderOptionsInit(&anim_options)) {
         status = NEXTIMAGE_ERROR_ENCODE_FAILED;
@@ -1013,6 +1018,36 @@ NextImageStatus nextimage_gif2webp_alloc(
         }
     } while (!done);
 
+    // For single-frame GIFs, use regular WebP encoding (like gif2webp does)
+    if (frame_number == 1) {
+        // Use curr_canvas which has the only frame
+        WebPMemoryWriter writer;
+        WebPMemoryWriterInit(&writer);
+        curr_canvas.writer = WebPMemoryWrite;
+        curr_canvas.custom_ptr = &writer;
+
+        if (!WebPEncode(&config, &curr_canvas)) {
+            status = NEXTIMAGE_ERROR_ENCODE_FAILED;
+            nextimage_set_error("Failed to encode single-frame WebP");
+            WebPMemoryWriterClear(&writer);
+            goto End;
+        }
+
+        // Copy output
+        output->data = nextimage_malloc(writer.size);
+        if (!output->data) {
+            status = NEXTIMAGE_ERROR_OUT_OF_MEMORY;
+            nextimage_set_error("Failed to allocate output buffer");
+            WebPMemoryWriterClear(&writer);
+            goto End;
+        }
+        memcpy(output->data, writer.mem, writer.size);
+        output->size = writer.size;
+        WebPMemoryWriterClear(&writer);
+        goto End;
+    }
+
+    // For multi-frame GIFs, use animation encoder
     // Add final NULL frame
     if (!WebPAnimEncoderAdd(enc, NULL, frame_timestamp, NULL)) {
         status = NEXTIMAGE_ERROR_ENCODE_FAILED;

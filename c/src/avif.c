@@ -134,6 +134,17 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
     options->format = NEXTIMAGE_FORMAT_RGBA;
     options->ignore_exif = 0;
     options->ignore_xmp = 0;
+    options->ignore_icc = 0;
+
+    // Security limits (match AVIF defaults)
+    options->image_size_limit = AVIF_DEFAULT_IMAGE_SIZE_LIMIT;        // 268435456 pixels (16384 x 16384)
+    options->image_dimension_limit = AVIF_DEFAULT_IMAGE_DIMENSION_LIMIT; // 32768
+
+    // Validation flags (1 = AVIF_STRICT_ENABLED)
+    options->strict_flags = 1;  // Enable strict validation by default
+
+    // Chroma upsampling (0 = AVIF_CHROMA_UPSAMPLING_AUTOMATIC)
+    options->chroma_upsampling = 0;  // Automatic (default)
 }
 
 // YUV format を avifPixelFormat に変換
@@ -548,6 +559,18 @@ NextImageStatus nextimage_avif_decode_alloc(
     // Set decoder options
     decoder->ignoreExif = options->ignore_exif ? AVIF_TRUE : AVIF_FALSE;
     decoder->ignoreXMP = options->ignore_xmp ? AVIF_TRUE : AVIF_FALSE;
+    // Note: libavif doesn't support ignoreColorProfile, so we'll handle ignore_icc after decoding
+
+    // Set security limits
+    decoder->imageSizeLimit = options->image_size_limit;
+    decoder->imageDimensionLimit = options->image_dimension_limit;
+
+    // Set strict validation flags
+    if (options->strict_flags == 0) {
+        decoder->strictFlags = AVIF_STRICT_DISABLED;
+    } else {
+        decoder->strictFlags = AVIF_STRICT_ENABLED;
+    }
 
     // Parse input
     avifResult result = avifDecoderSetIOMemory(decoder, avif_data, avif_size);
@@ -580,6 +603,9 @@ NextImageStatus nextimage_avif_decode_alloc(
     avifRGBImageSetDefaults(&rgb, image);
     rgb.format = pixel_format_to_avif_rgb(options->format);
     rgb.depth = 8; // Always output 8-bit for now
+
+    // Set chroma upsampling mode
+    rgb.chromaUpsampling = (avifChromaUpsampling)options->chroma_upsampling;
 
     // Allocate RGB buffer
     avifResult allocResult = avifRGBImageAllocatePixels(&rgb);
