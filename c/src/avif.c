@@ -5,6 +5,12 @@
 // libavif headers
 #include "avif/avif.h"
 
+// imageio headers for reading JPEG/PNG/etc (from libwebp)
+#include "image_dec.h"
+
+// libwebp Picture for intermediate conversion
+#include "webp/encode.h"
+
 // デフォルトエンコードオプション
 void nextimage_avif_default_encode_options(NextImageAVIFEncodeOptions* options) {
     if (!options) return;
@@ -68,75 +74,96 @@ static avifRGBFormat pixel_format_to_avif_rgb(NextImagePixelFormat format) {
     }
 }
 
-// エンコード実装
+// エンコード実装（画像ファイルデータから）
 NextImageStatus nextimage_avif_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
-    int width,
-    int height,
-    NextImagePixelFormat input_format,
     const NextImageAVIFEncodeOptions* options,
     NextImageEncodeBuffer* output
 ) {
-    // input_size is for future validation
-    (void)input_size;
-
-    if (!input_data || !output) {
+    if (!input_data || input_size == 0 || !output) {
         nextimage_set_error("Invalid parameters: NULL input or output");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    if (width <= 0 || height <= 0) {
-        nextimage_set_error("Invalid image dimensions: %dx%d", width, height);
-        return NEXTIMAGE_ERROR_INVALID_PARAM;
-    }
-
-    // Clear output
     memset(output, 0, sizeof(NextImageEncodeBuffer));
 
-    // Get options or use defaults
+    // デフォルトオプション
     NextImageAVIFEncodeOptions default_opts;
     if (!options) {
         nextimage_avif_default_encode_options(&default_opts);
         options = &default_opts;
     }
 
-    // Create AVIF image
-    avifImage* image = avifImageCreate(width, height, options->bit_depth, yuv_format_to_avif(options->yuv_format));
+    // 画像フォーマットを推測（libwebpのimageioを使用）
+    WebPInputFileFormat format = WebPGuessImageType(input_data, input_size);
+    if (format == WEBP_UNSUPPORTED_FORMAT) {
+        nextimage_set_error("Unsupported or unrecognized image format");
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    // 適切なリーダーを取得
+    WebPImageReader reader = WebPGetImageReader(format);
+    if (!reader) {
+        nextimage_set_error("No reader available for this image format");
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    // WebPPictureに一旦読み込む（imageioを使うため）
+    WebPPicture picture;
+    if (!WebPPictureInit(&picture)) {
+        nextimage_set_error("Failed to initialize WebPPicture");
+        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    }
+
+    if (!reader(input_data, input_size, &picture, 1, NULL)) {
+        WebPPictureFree(&picture);
+        nextimage_set_error("Failed to read input image");
+        return NEXTIMAGE_ERROR_DECODE_FAILED;
+    }
+
+    // avifImageを作成
+    avifImage* image = avifImageCreate(
+        picture.width,
+        picture.height,
+        options->bit_depth,
+        yuv_format_to_avif(options->yuv_format)
+    );
     if (!image) {
-        nextimage_set_error("Failed to create AVIF image");
+        WebPPictureFree(&picture);
+        nextimage_set_error("Failed to create avifImage");
         return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
     }
 
-    // Setup RGB source
+    // avifRGBImageを設定
     avifRGBImage rgb;
     avifRGBImageSetDefaults(&rgb, image);
-    rgb.format = pixel_format_to_avif_rgb(input_format);
-    rgb.depth = 8; // Input is always 8-bit for now
+    rgb.format = AVIF_RGB_FORMAT_RGBA;
+    rgb.depth = 8;
 
-    // Calculate stride
-    int bytes_per_pixel;
-    switch (input_format) {
-        case NEXTIMAGE_FORMAT_RGBA:
-        case NEXTIMAGE_FORMAT_BGRA:
-            bytes_per_pixel = 4;
-            break;
-        case NEXTIMAGE_FORMAT_RGB:
-            bytes_per_pixel = 3;
-            break;
-        default:
-            avifImageDestroy(image);
-            nextimage_set_error("Unsupported input format: %d", input_format);
-            return NEXTIMAGE_ERROR_UNSUPPORTED;
+    // RGBAバッファを割り当て
+    avifResult allocResult = avifRGBImageAllocatePixels(&rgb);
+    if (allocResult != AVIF_RESULT_OK) {
+        avifImageDestroy(image);
+        WebPPictureFree(&picture);
+        nextimage_set_error("Failed to allocate RGB buffer: %s", avifResultToString(allocResult));
+        return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
     }
 
-    rgb.width = width;
-    rgb.height = height;
-    rgb.rowBytes = width * bytes_per_pixel;
-    rgb.pixels = (uint8_t*)input_data;
+    // WebPPictureのピクセルをRGBバッファにコピー
+    if (!WebPPictureImportRGBA(&picture, rgb.pixels, rgb.rowBytes)) {
+        avifRGBImageFreePixels(&rgb);
+        avifImageDestroy(image);
+        WebPPictureFree(&picture);
+        nextimage_set_error("Failed to import RGBA data");
+        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    }
 
-    // Convert RGB to YUV
+    // RGBからYUVに変換
     avifResult result = avifImageRGBToYUV(image, &rgb);
+    avifRGBImageFreePixels(&rgb);
+    WebPPictureFree(&picture);
+
     if (result != AVIF_RESULT_OK) {
         avifImageDestroy(image);
         nextimage_set_error("Failed to convert RGB to YUV: %s", avifResultToString(result));
