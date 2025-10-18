@@ -221,6 +221,10 @@ NextImageStatus nextimage_webp_decode_alloc(
         return NEXTIMAGE_ERROR_DECODE_FAILED;
     }
 
+    // Set data_size
+    output->data_size = buffer_size;
+    output->owns_data = 1;
+
     // Planar formats not supported for WebP
     output->u_plane = NULL;
     output->v_plane = NULL;

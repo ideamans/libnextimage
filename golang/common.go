@@ -5,13 +5,12 @@ package libnextimage
 
 // macOS ARM64: Link to combined static library in lib/darwin-arm64
 #cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
-#cgo darwin,arm64 LDFLAGS: -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/libpng/lib
-#cgo darwin,arm64 LDFLAGS: -ljpeg -lpng -lz
+#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a -lz
 #cgo darwin,arm64 LDFLAGS: -framework CoreFoundation
 
 // macOS Intel: Link to combined static library in lib/darwin-amd64
 #cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage
-#cgo darwin,amd64 LDFLAGS: -ljpeg -lpng -lz
+#cgo darwin,amd64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a -lz
 #cgo darwin,amd64 LDFLAGS: -framework CoreFoundation
 
 // Linux x64: Link to combined static library in lib/linux-amd64
