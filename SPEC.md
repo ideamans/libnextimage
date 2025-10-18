@@ -320,8 +320,8 @@ import (
 )
 
 func main() {
-    // 例1: WebP エンコード - ファイル同士
-    err := libnextimage.WebPEncodeFile("input.jpg", "output.webp",
+    // 例1: JPEG → WebP 変換 - ファイル同士
+    err := libnextimage.ToWebPFile("input.jpg", "output.webp",
         libnextimage.WebPEncodeOptions{
             Quality: 80,
             Method: 4,
@@ -330,24 +330,21 @@ func main() {
         panic(err)
     }
 
-    // 例2: WebP デコード - ファイル同士
+    // 例2: WebP デコード → PNG保存 - ファイル同士
     err = libnextimage.WebPDecodeFile("input.webp", "output.png",
-        libnextimage.WebPDecodeOptions{
-            UseThreads: true,
-            Format: libnextimage.FormatRGBA,
-        })
+        libnextimage.WebPDecodeOptions{})
     if err != nil {
         panic(err)
     }
 
-    // 例3: AVIF エンコード - ストリーム同士
-    inFile, _ := os.Open("input.jpg")
+    // 例3: PNG → AVIF 変換 - ストリーム同士
+    inFile, _ := os.Open("input.png")
     defer inFile.Close()
 
     outFile, _ := os.Create("output.avif")
     defer outFile.Close()
 
-    err = libnextimage.AVIFEncodeStream(inFile, outFile,
+    err = libnextimage.ToAVIFStream(inFile, outFile,
         libnextimage.AVIFEncodeOptions{
             Quality: 50,
             Speed: 6,
@@ -356,100 +353,85 @@ func main() {
         panic(err)
     }
 
-    // 例4: AVIF エンコード - バイト列同士
-    imageData := make([]byte, width*height*4) // RGBA data
-    // ... imageDataを準備 ...
+    // 例4: JPEG → AVIF 変換 - バイト列同士
+    jpegData, _ := os.ReadFile("input.jpg")
 
-    avifBytes, err := libnextimage.AVIFEncodeBytes(
-        imageData, width, height,
-        libnextimage.FormatRGBA,
+    avifBytes, err := libnextimage.ToAVIFBytes(jpegData,
         libnextimage.AVIFEncodeOptions{Quality: 75})
     if err != nil {
         panic(err)
     }
+    os.WriteFile("output.avif", avifBytes, 0644)
 
-    // 例5: AVIF デコード - バイト列から構造体へ
-    decoded, err := libnextimage.AVIFDecodeBytes(avifBytes,
-        libnextimage.AVIFDecodeOptions{Format: libnextimage.FormatRGBA})
+    // 例5: WebP デコード - バイト列からピクセルデータへ
+    webpData, _ := os.ReadFile("input.webp")
+
+    decoded, err := libnextimage.WebPDecodeBytes(webpData,
+        libnextimage.WebPDecodeOptions{})
     if err != nil {
         panic(err)
     }
-    // decoded.Data, decoded.Width, decoded.Height などを使用
+    // decoded.Data (RGBAピクセルデータ), decoded.Width, decoded.Height を使用
+    // 例: 画像処理やメモリ上での操作に利用
 }
 ```
 
 ## API設計
 
 シンプルさと明確さを重視し、入出力の組み合わせを3つのパターンに限定:
-1. **バイト配列同士** (`*Bytes`): メモリ上のデータを直接変換
+1. **バイト配列同士** (`*Bytes`): 画像ファイルのバイトデータを直接変換（JPEG→WebP、PNG→AVIFなど）
 2. **ファイル同士** (`*File`): ファイルパスを指定して変換
 3. **ストリーム同士** (`*Stream`): io.Reader/io.Writerで変換
 
+**重要**: `*Bytes`関数は画像ファイルフォーマット（JPEG、PNG、WebP、AVIFなど）のバイトデータを扱います。
+ピクセルデータ（RGBA配列など）を直接扱う場合は、C FFIレイヤーを使用してください。
+
 各フォーマットに対して以下の関数を提供:
 
-### WebP
+### 画像フォーマット変換
 
 ```go
-// エンコード - []byte入力 → []byte出力
-func WebPEncodeBytes(data []byte, width, height int, format PixelFormat, opts WebPEncodeOptions) ([]byte, error)
+// JPEG/PNG/その他 → WebP
+func ToWebPBytes(imageData []byte, opts WebPEncodeOptions) ([]byte, error)
+func ToWebPFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
+func ToWebPStream(input io.Reader, output io.Writer, opts WebPEncodeOptions) error
 
-// エンコード - ファイル入力 → ファイル出力
-func WebPEncodeFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
+// JPEG/PNG/その他 → AVIF
+func ToAVIFBytes(imageData []byte, opts AVIFEncodeOptions) ([]byte, error)
+func ToAVIFFile(inputPath string, outputPath string, opts AVIFEncodeOptions) error
+func ToAVIFStream(input io.Reader, output io.Writer, opts AVIFEncodeOptions) error
 
-// エンコード - ストリーム入力 → ストリーム出力
-func WebPEncodeStream(input io.Reader, output io.Writer, opts WebPEncodeOptions) error
-
-// デコード - []byte入力 → DecodedImage出力
+// WebP → JPEG/PNG/その他（デコード）
 func WebPDecodeBytes(webpData []byte, opts WebPDecodeOptions) (*DecodedImage, error)
-
-// デコード - ファイル入力 → ファイル出力
 func WebPDecodeFile(inputPath string, outputPath string, opts WebPDecodeOptions) error
-
-// デコード - ストリーム入力 → ストリーム出力
 func WebPDecodeStream(input io.Reader, output io.Writer, opts WebPDecodeOptions) error
 
-// GIF to WebP - []byte入力 → []byte出力
-func GIF2WebPBytes(gifData []byte, opts WebPEncodeOptions) ([]byte, error)
+// AVIF → JPEG/PNG/その他（デコード）
+func AVIFDecodeBytes(avifData []byte, opts AVIFDecodeOptions) (*DecodedImage, error)
+func AVIFDecodeFile(inputPath string, outputPath string, opts AVIFDecodeOptions) error
+func AVIFDecodeStream(input io.Reader, output io.Writer, opts AVIFDecodeOptions) error
 
-// GIF to WebP - ファイル入力 → ファイル出力
+// GIF → WebP（アニメーション対応）
+func GIF2WebPBytes(gifData []byte, opts WebPEncodeOptions) ([]byte, error)
 func GIF2WebPFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
 
-// WebP to GIF - []byte入力 → []byte出力
+// WebP → GIF（アニメーション対応）
 func WebP2GIFBytes(webpData []byte) ([]byte, error)
-
-// WebP to GIF - ファイル入力 → ファイル出力
 func WebP2GIFFile(inputPath string, outputPath string) error
-```
 
-### AVIF
-
-```go
-// エンコード - []byte入力 → []byte出力
-func AVIFEncodeBytes(data []byte, width, height int, format PixelFormat, opts AVIFEncodeOptions) ([]byte, error)
-
-// エンコード - ファイル入力 → ファイル出力
-func AVIFEncodeFile(inputPath string, outputPath string, opts AVIFEncodeOptions) error
-
-// エンコード - ストリーム入力 → ストリーム出力
-func AVIFEncodeStream(input io.Reader, output io.Writer, opts AVIFEncodeOptions) error
-
-// デコード - []byte入力 → DecodedImage出力
-func AVIFDecodeBytes(avifData []byte, opts AVIFDecodeOptions) (*DecodedImage, error)
-
-// デコード - ファイル入力 → ファイル出力
-func AVIFDecodeFile(inputPath string, outputPath string, opts AVIFDecodeOptions) error
-
-// デコード - ストリーム入力 → ストリーム出力
-func AVIFDecodeStream(input io.Reader, output io.Writer, opts AVIFDecodeOptions) error
+// フォーマット間の直接変換
+func WebPToAVIFBytes(webpData []byte, opts AVIFEncodeOptions) ([]byte, error)
+func AVIFToWebPBytes(avifData []byte, opts WebPEncodeOptions) ([]byte, error)
 ```
 
 ### API設計の原則
 
 1. **入出力の一貫性**: 入力と出力の型を統一（Bytes同士、File同士、Stream同士）
-2. **関数名の明確さ**: 関数名のサフィックスで入出力の型が分かる
-3. **ジェネリクス不使用**: 型安全性とシンプルさを両立
+2. **関数名の明確さ**: 関数名で入出力フォーマットと型が分かる
+3. **画像フォーマットの抽象化**: JPEG/PNGなどは自動判定、明示的な指定は不要
 4. **エラーハンドリング**: すべての関数がerrorを返す
 5. **オプション構造体**: 各フォーマット固有のオプションを型安全に扱う
+6. **デコード結果**: `DecodedImage`構造体でピクセルデータとメタデータを返す
 
 ### 共通型定義
 
