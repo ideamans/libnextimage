@@ -71,6 +71,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libavif/include
 )
 
@@ -83,6 +84,11 @@ set(SOURCES
 
 # 静的ライブラリのビルド
 add_library(nextimage STATIC ${SOURCES})
+
+# nextimageターゲットのインクルードディレクトリを追加
+target_include_directories(nextimage PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
+)
 
 # libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
 # webp, webpdemux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる

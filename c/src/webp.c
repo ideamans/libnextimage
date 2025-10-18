@@ -8,6 +8,9 @@
 #include "webp/demux.h"
 #include "webp/mux.h"
 
+// imageio headers for reading JPEG/PNG/etc
+#include "image_dec.h"
+
 // デフォルトエンコードオプション
 void nextimage_webp_default_encode_options(NextImageWebPEncodeOptions* options) {
     if (!options) return;
@@ -68,191 +71,223 @@ static int setup_webp_config(WebPConfig* config, const NextImageWebPEncodeOption
     return 1;
 }
 
-// エンコード実装
+// メモリライターコールバック
+static int webp_memory_writer(const uint8_t* data, size_t data_size, const WebPPicture* picture) {
+    NextImageEncodeBuffer* output = (NextImageEncodeBuffer*)picture->custom_ptr;
+
+    // Reallocate buffer
+    size_t new_size = output->size + data_size;
+    uint8_t* new_data = (uint8_t*)nextimage_realloc(output->data, new_size);
+    if (!new_data) {
+        return 0;
+    }
+
+    memcpy(new_data + output->size, data, data_size);
+    output->data = new_data;
+    output->size = new_size;
+
+    return 1;
+}
+
+// エンコード実装（画像ファイルデータから）
 NextImageStatus nextimage_webp_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
-    int width,
-    int height,
-    NextImagePixelFormat input_format,
     const NextImageWebPEncodeOptions* options,
     NextImageEncodeBuffer* output
 ) {
-    // input_size is for future validation
-    (void)input_size;
-
-    if (!input_data || !output) {
+    if (!input_data || input_size == 0 || !output) {
         nextimage_set_error("Invalid parameters: NULL input or output");
-        return NEXTIMAGE_ERROR_INVALID_PARAM;
-    }
-
-    if (width <= 0 || height <= 0) {
-        nextimage_set_error("Invalid image dimensions: %dx%d", width, height);
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
     // Clear output
     memset(output, 0, sizeof(NextImageEncodeBuffer));
 
-    // Setup WebP config
-    WebPConfig config;
-    if (!setup_webp_config(&config, options)) {
-        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    // 画像フォーマットを推測
+    WebPInputFileFormat format = WebPGuessImageType(input_data, input_size);
+    if (format == WEBP_UNSUPPORTED_FORMAT) {
+        nextimage_set_error("Unsupported or unrecognized image format");
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
     }
 
-    // Setup picture
+    // 適切なリーダーを取得
+    WebPImageReader reader = WebPGetImageReader(format);
+    if (!reader) {
+        nextimage_set_error("No reader available for this image format");
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    // WebPPictureを初期化
     WebPPicture picture;
     if (!WebPPictureInit(&picture)) {
-        nextimage_set_error("Failed to initialize WebP picture");
+        nextimage_set_error("Failed to initialize WebPPicture");
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 
-    picture.width = width;
-    picture.height = height;
-    picture.use_argb = 1; // Use ARGB format internally
-
-    // Import pixels based on format
-    int import_result = 0;
-    int stride = 0;
-
-    switch (input_format) {
-        case NEXTIMAGE_FORMAT_RGBA:
-            stride = width * 4;
-            import_result = WebPPictureImportRGBA(&picture, input_data, stride);
-            break;
-        case NEXTIMAGE_FORMAT_RGB:
-            stride = width * 3;
-            import_result = WebPPictureImportRGB(&picture, input_data, stride);
-            break;
-        case NEXTIMAGE_FORMAT_BGRA:
-            stride = width * 4;
-            import_result = WebPPictureImportBGRA(&picture, input_data, stride);
-            break;
-        default:
-            WebPPictureFree(&picture);
-            nextimage_set_error("Unsupported input format: %d", input_format);
-            return NEXTIMAGE_ERROR_UNSUPPORTED;
-    }
-
-    if (!import_result) {
+    // 画像を読み込む（keep_alpha=1, metadata=NULL）
+    if (!reader(input_data, input_size, &picture, 1, NULL)) {
         WebPPictureFree(&picture);
-        nextimage_set_error("Failed to import pixels into WebP picture");
+        nextimage_set_error("Failed to read input image");
+        return NEXTIMAGE_ERROR_DECODE_FAILED;
+    }
+
+    // WebP設定
+    WebPConfig config;
+    if (!setup_webp_config(&config, options)) {
+        WebPPictureFree(&picture);
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 
-    // Setup memory writer
-    WebPMemoryWriter writer;
-    WebPMemoryWriterInit(&writer);
-    picture.writer = WebPMemoryWrite;
-    picture.custom_ptr = &writer;
+    // カスタムライターを設定
+    picture.writer = webp_memory_writer;
+    picture.custom_ptr = output;
 
-    // Encode
+    // エンコード
     if (!WebPEncode(&config, &picture)) {
         WebPPictureFree(&picture);
-        WebPMemoryWriterClear(&writer);
+        if (output->data) {
+            nextimage_free(output->data);
+            output->data = NULL;
+            output->size = 0;
+        }
         nextimage_set_error("WebP encoding failed: %d", picture.error_code);
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 
-    // Copy output data using our tracked allocation
-    output->data = nextimage_malloc(writer.size);
-    if (!output->data) {
-        WebPPictureFree(&picture);
-        WebPMemoryWriterClear(&writer);
-        nextimage_set_error("Failed to allocate output buffer");
-        return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
-    }
-
-    memcpy(output->data, writer.mem, writer.size);
-    output->size = writer.size;
-
-    // Cleanup
     WebPPictureFree(&picture);
-    WebPMemoryWriterClear(&writer);
-
     return NEXTIMAGE_OK;
 }
 
-// デコード実装（alloc版）
+// WebPデコード実装
 NextImageStatus nextimage_webp_decode_alloc(
     const uint8_t* webp_data,
     size_t webp_size,
     const NextImageWebPDecodeOptions* options,
     NextImageDecodeBuffer* output
 ) {
-    if (!webp_data || !output) {
+    if (!webp_data || webp_size == 0 || !output) {
         nextimage_set_error("Invalid parameters: NULL input or output");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    // Clear output
     memset(output, 0, sizeof(NextImageDecodeBuffer));
 
-    // Get image dimensions
-    int width, height;
-    if (!WebPGetInfo(webp_data, webp_size, &width, &height)) {
-        nextimage_set_error("Failed to get WebP image info");
+    // Get image info
+    WebPBitstreamFeatures features;
+    VP8StatusCode status = WebPGetFeatures(webp_data, webp_size, &features);
+    if (status != VP8_STATUS_OK) {
+        nextimage_set_error("Failed to get WebP features: %d", status);
         return NEXTIMAGE_ERROR_DECODE_FAILED;
     }
 
-    // Decode based on requested format
-    NextImagePixelFormat format = options ? options->format : NEXTIMAGE_FORMAT_RGBA;
-    uint8_t* decoded_data = NULL;
-    int bytes_per_pixel = 0;
+    output->width = features.width;
+    output->height = features.height;
+    output->bit_depth = 8;
+    output->format = options ? options->format : NEXTIMAGE_FORMAT_RGBA;
 
-    switch (format) {
-        case NEXTIMAGE_FORMAT_RGBA:
-            bytes_per_pixel = 4;
-            decoded_data = WebPDecodeRGBA(webp_data, webp_size, &width, &height);
-            break;
-        case NEXTIMAGE_FORMAT_RGB:
-            bytes_per_pixel = 3;
-            decoded_data = WebPDecodeRGB(webp_data, webp_size, &width, &height);
-            break;
-        case NEXTIMAGE_FORMAT_BGRA:
-            bytes_per_pixel = 4;
-            decoded_data = WebPDecodeBGRA(webp_data, webp_size, &width, &height);
-            break;
-        default:
-            nextimage_set_error("Unsupported output format: %d", format);
-            return NEXTIMAGE_ERROR_UNSUPPORTED;
+    // Calculate buffer size
+    int bytes_per_pixel = (output->format == NEXTIMAGE_FORMAT_RGB) ? 3 : 4;
+    output->stride = output->width * bytes_per_pixel;
+    size_t buffer_size = output->stride * output->height;
+
+    // Allocate buffer
+    output->data = (uint8_t*)nextimage_malloc(buffer_size);
+    if (!output->data) {
+        nextimage_set_error("Failed to allocate decode buffer");
+        return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
+    }
+    output->data_capacity = buffer_size;
+
+    // Decode
+    uint8_t* result = NULL;
+    if (output->format == NEXTIMAGE_FORMAT_RGBA) {
+        result = WebPDecodeRGBAInto(webp_data, webp_size, output->data, buffer_size, output->stride);
+    } else if (output->format == NEXTIMAGE_FORMAT_RGB) {
+        result = WebPDecodeRGBInto(webp_data, webp_size, output->data, buffer_size, output->stride);
+    } else if (output->format == NEXTIMAGE_FORMAT_BGRA) {
+        result = WebPDecodeBGRAInto(webp_data, webp_size, output->data, buffer_size, output->stride);
+    } else {
+        nextimage_free(output->data);
+        output->data = NULL;
+        nextimage_set_error("Unsupported output format: %d", output->format);
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
     }
 
-    if (!decoded_data) {
+    if (!result) {
+        nextimage_free(output->data);
+        output->data = NULL;
         nextimage_set_error("WebP decoding failed");
         return NEXTIMAGE_ERROR_DECODE_FAILED;
     }
 
-    // Calculate size and copy to tracked allocation
-    size_t data_size = (size_t)width * height * bytes_per_pixel;
-    output->data = nextimage_malloc(data_size);
-    if (!output->data) {
-        WebPFree(decoded_data);
-        nextimage_set_error("Failed to allocate output buffer");
-        return NEXTIMAGE_ERROR_OUT_OF_MEMORY;
-    }
-
-    memcpy(output->data, decoded_data, data_size);
-    WebPFree(decoded_data);
-
-    // Set output metadata
-    output->data_size = data_size;
-    output->data_capacity = data_size;
-    output->stride = width * bytes_per_pixel;
-    output->width = width;
-    output->height = height;
-    output->bit_depth = 8;
-    output->format = format;
-    output->owns_data = 1;
-
-    // Planar data not used for interleaved formats
+    // Planar formats not supported for WebP
     output->u_plane = NULL;
     output->v_plane = NULL;
+    output->u_stride = 0;
+    output->v_stride = 0;
 
     return NEXTIMAGE_OK;
 }
 
-// デコードサイズ計算
+// WebPデコード（ユーザー提供バッファ）
+NextImageStatus nextimage_webp_decode_into(
+    const uint8_t* webp_data,
+    size_t webp_size,
+    const NextImageWebPDecodeOptions* options,
+    NextImageDecodeBuffer* buffer
+) {
+    if (!webp_data || webp_size == 0 || !buffer || !buffer->data) {
+        nextimage_set_error("Invalid parameters");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    // Get image info
+    WebPBitstreamFeatures features;
+    VP8StatusCode status = WebPGetFeatures(webp_data, webp_size, &features);
+    if (status != VP8_STATUS_OK) {
+        nextimage_set_error("Failed to get WebP features: %d", status);
+        return NEXTIMAGE_ERROR_DECODE_FAILED;
+    }
+
+    NextImagePixelFormat format = options ? options->format : NEXTIMAGE_FORMAT_RGBA;
+    int bytes_per_pixel = (format == NEXTIMAGE_FORMAT_RGB) ? 3 : 4;
+    int stride = features.width * bytes_per_pixel;
+    size_t required_size = stride * features.height;
+
+    if (buffer->data_capacity < required_size) {
+        nextimage_set_error("Buffer too small: need %zu, have %zu", required_size, buffer->data_capacity);
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    // Decode into user buffer
+    uint8_t* result = NULL;
+    if (format == NEXTIMAGE_FORMAT_RGBA) {
+        result = WebPDecodeRGBAInto(webp_data, webp_size, buffer->data, buffer->data_capacity, stride);
+    } else if (format == NEXTIMAGE_FORMAT_RGB) {
+        result = WebPDecodeRGBInto(webp_data, webp_size, buffer->data, buffer->data_capacity, stride);
+    } else if (format == NEXTIMAGE_FORMAT_BGRA) {
+        result = WebPDecodeBGRAInto(webp_data, webp_size, buffer->data, buffer->data_capacity, stride);
+    } else {
+        nextimage_set_error("Unsupported output format: %d", format);
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    if (!result) {
+        nextimage_set_error("WebP decoding failed");
+        return NEXTIMAGE_ERROR_DECODE_FAILED;
+    }
+
+    buffer->width = features.width;
+    buffer->height = features.height;
+    buffer->stride = stride;
+    buffer->bit_depth = 8;
+    buffer->format = format;
+
+    return NEXTIMAGE_OK;
+}
+
+// デコードサイズ取得
 NextImageStatus nextimage_webp_decode_size(
     const uint8_t* webp_data,
     size_t webp_size,
@@ -260,79 +295,38 @@ NextImageStatus nextimage_webp_decode_size(
     int* height,
     size_t* required_size
 ) {
-    if (!webp_data || !width || !height || !required_size) {
-        nextimage_set_error("Invalid parameters: NULL pointer");
+    if (!webp_data || webp_size == 0 || !width || !height || !required_size) {
+        nextimage_set_error("Invalid parameters");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    if (!WebPGetInfo(webp_data, webp_size, width, height)) {
-        nextimage_set_error("Failed to get WebP image info");
+    WebPBitstreamFeatures features;
+    VP8StatusCode status = WebPGetFeatures(webp_data, webp_size, &features);
+    if (status != VP8_STATUS_OK) {
+        nextimage_set_error("Failed to get WebP features: %d", status);
         return NEXTIMAGE_ERROR_DECODE_FAILED;
     }
 
-    // Assume RGBA format (4 bytes per pixel)
-    *required_size = (size_t)(*width) * (*height) * 4;
+    *width = features.width;
+    *height = features.height;
+    *required_size = features.width * features.height * 4; // RGBA
 
     return NEXTIMAGE_OK;
 }
 
-// デコード（into版）- 簡易実装（allocしてコピー）
-NextImageStatus nextimage_webp_decode_into(
-    const uint8_t* webp_data,
-    size_t webp_size,
-    const NextImageWebPDecodeOptions* options,
-    NextImageDecodeBuffer* buffer
-) {
-    if (!buffer || !buffer->data || buffer->data_capacity == 0) {
-        nextimage_set_error("Invalid buffer: data or capacity not set");
-        return NEXTIMAGE_ERROR_INVALID_PARAM;
-    }
-
-    // Decode to temporary buffer first
-    NextImageDecodeBuffer temp;
-    NextImageStatus status = nextimage_webp_decode_alloc(webp_data, webp_size, options, &temp);
-    if (status != NEXTIMAGE_OK) {
-        return status;
-    }
-
-    // Check buffer size
-    if (buffer->data_capacity < temp.data_size) {
-        nextimage_free_decode_buffer(&temp);
-        nextimage_set_error("Buffer too small: need %zu bytes, have %zu bytes",
-                          temp.data_size, buffer->data_capacity);
-        return NEXTIMAGE_ERROR_BUFFER_TOO_SMALL;
-    }
-
-    // Copy to user buffer
-    memcpy(buffer->data, temp.data, temp.data_size);
-    buffer->data_size = temp.data_size;
-    buffer->stride = temp.stride;
-    buffer->width = temp.width;
-    buffer->height = temp.height;
-    buffer->bit_depth = temp.bit_depth;
-    buffer->format = temp.format;
-    // owns_data remains as set by caller
-
-    nextimage_free_decode_buffer(&temp);
-
-    return NEXTIMAGE_OK;
-}
-
-// GIF to WebP と WebP to GIF は後で実装（Phase 4）
+// GIF to WebP conversion
 NextImageStatus nextimage_gif2webp_alloc(
     const uint8_t* gif_data,
     size_t gif_size,
     const NextImageWebPEncodeOptions* options,
     NextImageEncodeBuffer* output
 ) {
-    (void)gif_data;
-    (void)gif_size;
-    (void)options;
-    (void)output;
-    nextimage_set_error("GIF to WebP conversion not yet implemented");
-    return NEXTIMAGE_ERROR_UNSUPPORTED;
+    // GIF is also handled by image_dec.h
+    // Just use the same encode_alloc function
+    return nextimage_webp_encode_alloc(gif_data, gif_size, options, output);
 }
 
+// WebP to GIF conversion (placeholder - requires GIF encoder)
 NextImageStatus nextimage_webp2gif_alloc(
     const uint8_t* webp_data,
     size_t webp_size,
@@ -341,6 +335,113 @@ NextImageStatus nextimage_webp2gif_alloc(
     (void)webp_data;
     (void)webp_size;
     (void)output;
+
     nextimage_set_error("WebP to GIF conversion not yet implemented");
     return NEXTIMAGE_ERROR_UNSUPPORTED;
+}
+
+// ========================================
+// インスタンスベースのエンコーダー/デコーダー
+// ========================================
+
+// エンコーダー構造体
+struct NextImageWebPEncoder {
+    WebPConfig config;
+    NextImageWebPEncodeOptions options;
+};
+
+// デコーダー構造体
+struct NextImageWebPDecoder {
+    NextImageWebPDecodeOptions options;
+};
+
+// エンコーダーの作成
+NextImageWebPEncoder* nextimage_webp_encoder_create(
+    const NextImageWebPEncodeOptions* options
+) {
+    NextImageWebPEncoder* encoder = (NextImageWebPEncoder*)nextimage_malloc(sizeof(NextImageWebPEncoder));
+    if (!encoder) {
+        nextimage_set_error("Failed to allocate encoder");
+        return NULL;
+    }
+
+    // オプションをコピー
+    if (options) {
+        encoder->options = *options;
+    } else {
+        nextimage_webp_default_encode_options(&encoder->options);
+    }
+
+    // WebPConfigを事前設定
+    if (!setup_webp_config(&encoder->config, &encoder->options)) {
+        nextimage_free(encoder);
+        return NULL;
+    }
+
+    return encoder;
+}
+
+// エンコーダーでエンコード
+NextImageStatus nextimage_webp_encoder_encode(
+    NextImageWebPEncoder* encoder,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageEncodeBuffer* output
+) {
+    if (!encoder) {
+        nextimage_set_error("Invalid encoder instance");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    // エンコーダーのconfigを使って通常のエンコード処理
+    // （configは既に設定済み）
+    return nextimage_webp_encode_alloc(input_data, input_size, &encoder->options, output);
+}
+
+// エンコーダーの破棄
+void nextimage_webp_encoder_destroy(NextImageWebPEncoder* encoder) {
+    if (encoder) {
+        nextimage_free(encoder);
+    }
+}
+
+// デコーダーの作成
+NextImageWebPDecoder* nextimage_webp_decoder_create(
+    const NextImageWebPDecodeOptions* options
+) {
+    NextImageWebPDecoder* decoder = (NextImageWebPDecoder*)nextimage_malloc(sizeof(NextImageWebPDecoder));
+    if (!decoder) {
+        nextimage_set_error("Failed to allocate decoder");
+        return NULL;
+    }
+
+    if (options) {
+        decoder->options = *options;
+    } else {
+        nextimage_webp_default_decode_options(&decoder->options);
+    }
+
+    return decoder;
+}
+
+// デコーダーでデコード
+NextImageStatus nextimage_webp_decoder_decode(
+    NextImageWebPDecoder* decoder,
+    const uint8_t* webp_data,
+    size_t webp_size,
+    NextImageDecodeBuffer* output
+) {
+    if (!decoder) {
+        nextimage_set_error("Invalid decoder instance");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_webp_decode_alloc(webp_data, webp_size, &decoder->options, output);
+}
+
+// デコーダーの破棄
+void nextimage_webp_decoder_destroy(NextImageWebPDecoder* decoder) {
+    if (decoder) {
+        nextimage_free(decoder);
+    }
 }
