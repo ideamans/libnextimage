@@ -191,6 +191,10 @@ enable_testing()
 add_executable(basic_test test/basic_test.c)
 target_link_libraries(basic_test nextimage)
 
+# 新しいAPIのシンプルテスト
+add_executable(simple_test test/simple_test.c)
+target_link_libraries(simple_test nextimage)
+
 # Sanitizerフラグをテストにも適用
 if(ENABLE_ASAN)
     target_compile_options(basic_test PRIVATE -fsanitize=address -fno-omit-frame-pointer)
@@ -203,6 +207,19 @@ if(ENABLE_UBSAN)
 endif()
 
 add_test(NAME BasicTest COMMAND basic_test)
+
+# シンプルテスト（新API）
+add_test(NAME SimpleTest COMMAND simple_test)
+
+if(ENABLE_ASAN)
+    target_compile_options(simple_test PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(simple_test PRIVATE -fsanitize=address)
+endif()
+
+if(ENABLE_UBSAN)
+    target_compile_options(simple_test PRIVATE -fsanitize=undefined)
+    target_link_options(simple_test PRIVATE -fsanitize=undefined)
+endif()
 
 # WebPテスト
 add_executable(webp_test test/webp_test.c)
