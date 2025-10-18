@@ -320,90 +320,136 @@ import (
 )
 
 func main() {
-    // WebP エンコード: ファイル -> バイト列
-    webpData, err := libnextimage.WebPEncodeFile("input.jpg", libnextimage.WebPEncodeOptions{
-        Quality: 80,
-        Method: 4,
-    })
+    // 例1: WebP エンコード - ファイル同士
+    err := libnextimage.WebPEncodeFile("input.jpg", "output.webp",
+        libnextimage.WebPEncodeOptions{
+            Quality: 80,
+            Method: 4,
+        })
     if err != nil {
         panic(err)
     }
 
-    // WebP デコード: バイト列 -> ファイル
-    err = libnextimage.WebPDecodeToFile(webpData, "output.png", libnextimage.WebPDecodeOptions{
-        UseThreads: true,
-        Format: libnextimage.FormatRGBA,
-    })
+    // 例2: WebP デコード - ファイル同士
+    err = libnextimage.WebPDecodeFile("input.webp", "output.png",
+        libnextimage.WebPDecodeOptions{
+            UseThreads: true,
+            Format: libnextimage.FormatRGBA,
+        })
     if err != nil {
         panic(err)
     }
 
-    // AVIF エンコード: io.Reader -> io.Writer
+    // 例3: AVIF エンコード - ストリーム同士
     inFile, _ := os.Open("input.jpg")
     defer inFile.Close()
 
     outFile, _ := os.Create("output.avif")
     defer outFile.Close()
 
-    err = libnextimage.AVIFEncodeStream(inFile, outFile, libnextimage.AVIFEncodeOptions{
-        Quality: 50,
-        Speed: 6,
-    })
+    err = libnextimage.AVIFEncodeStream(inFile, outFile,
+        libnextimage.AVIFEncodeOptions{
+            Quality: 50,
+            Speed: 6,
+        })
     if err != nil {
         panic(err)
     }
 
-    // バイト列同士の変換
-    avifBytes, err := libnextimage.AVIFEncodeBytes(imageData, width, height,
-        libnextimage.FormatRGBA, libnextimage.AVIFEncodeOptions{
-            Quality: 75,
-        })
+    // 例4: AVIF エンコード - バイト列同士
+    imageData := make([]byte, width*height*4) // RGBA data
+    // ... imageDataを準備 ...
+
+    avifBytes, err := libnextimage.AVIFEncodeBytes(
+        imageData, width, height,
+        libnextimage.FormatRGBA,
+        libnextimage.AVIFEncodeOptions{Quality: 75})
+    if err != nil {
+        panic(err)
+    }
+
+    // 例5: AVIF デコード - バイト列から構造体へ
+    decoded, err := libnextimage.AVIFDecodeBytes(avifBytes,
+        libnextimage.AVIFDecodeOptions{Format: libnextimage.FormatRGBA})
+    if err != nil {
+        panic(err)
+    }
+    // decoded.Data, decoded.Width, decoded.Height などを使用
 }
 ```
 
 ## API設計
+
+シンプルさと明確さを重視し、入出力の組み合わせを3つのパターンに限定:
+1. **バイト配列同士** (`*Bytes`): メモリ上のデータを直接変換
+2. **ファイル同士** (`*File`): ファイルパスを指定して変換
+3. **ストリーム同士** (`*Stream`): io.Reader/io.Writerで変換
 
 各フォーマットに対して以下の関数を提供:
 
 ### WebP
 
 ```go
-// エンコード
+// エンコード - []byte入力 → []byte出力
 func WebPEncodeBytes(data []byte, width, height int, format PixelFormat, opts WebPEncodeOptions) ([]byte, error)
-func WebPEncodeFile(inputPath string, opts WebPEncodeOptions) ([]byte, error)
-func WebPEncodeToFile(data []byte, width, height int, format PixelFormat, outputPath string, opts WebPEncodeOptions) error
+
+// エンコード - ファイル入力 → ファイル出力
+func WebPEncodeFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
+
+// エンコード - ストリーム入力 → ストリーム出力
 func WebPEncodeStream(input io.Reader, output io.Writer, opts WebPEncodeOptions) error
 
-// デコード
+// デコード - []byte入力 → DecodedImage出力
 func WebPDecodeBytes(webpData []byte, opts WebPDecodeOptions) (*DecodedImage, error)
-func WebPDecodeFile(inputPath string, opts WebPDecodeOptions) (*DecodedImage, error)
-func WebPDecodeToFile(webpData []byte, outputPath string, opts WebPDecodeOptions) error
+
+// デコード - ファイル入力 → ファイル出力
+func WebPDecodeFile(inputPath string, outputPath string, opts WebPDecodeOptions) error
+
+// デコード - ストリーム入力 → ストリーム出力
 func WebPDecodeStream(input io.Reader, output io.Writer, opts WebPDecodeOptions) error
 
-// GIF to WebP
+// GIF to WebP - []byte入力 → []byte出力
 func GIF2WebPBytes(gifData []byte, opts WebPEncodeOptions) ([]byte, error)
-func GIF2WebPFile(inputPath string, opts WebPEncodeOptions) ([]byte, error)
 
-// WebP to GIF
+// GIF to WebP - ファイル入力 → ファイル出力
+func GIF2WebPFile(inputPath string, outputPath string, opts WebPEncodeOptions) error
+
+// WebP to GIF - []byte入力 → []byte出力
 func WebP2GIFBytes(webpData []byte) ([]byte, error)
+
+// WebP to GIF - ファイル入力 → ファイル出力
 func WebP2GIFFile(inputPath string, outputPath string) error
 ```
 
 ### AVIF
 
 ```go
-// エンコード
+// エンコード - []byte入力 → []byte出力
 func AVIFEncodeBytes(data []byte, width, height int, format PixelFormat, opts AVIFEncodeOptions) ([]byte, error)
-func AVIFEncodeFile(inputPath string, opts AVIFEncodeOptions) ([]byte, error)
-func AVIFEncodeToFile(data []byte, width, height int, format PixelFormat, outputPath string, opts AVIFEncodeOptions) error
+
+// エンコード - ファイル入力 → ファイル出力
+func AVIFEncodeFile(inputPath string, outputPath string, opts AVIFEncodeOptions) error
+
+// エンコード - ストリーム入力 → ストリーム出力
 func AVIFEncodeStream(input io.Reader, output io.Writer, opts AVIFEncodeOptions) error
 
-// デコード
+// デコード - []byte入力 → DecodedImage出力
 func AVIFDecodeBytes(avifData []byte, opts AVIFDecodeOptions) (*DecodedImage, error)
-func AVIFDecodeFile(inputPath string, opts AVIFDecodeOptions) (*DecodedImage, error)
-func AVIFDecodeToFile(avifData []byte, outputPath string, opts AVIFDecodeOptions) error
+
+// デコード - ファイル入力 → ファイル出力
+func AVIFDecodeFile(inputPath string, outputPath string, opts AVIFDecodeOptions) error
+
+// デコード - ストリーム入力 → ストリーム出力
 func AVIFDecodeStream(input io.Reader, output io.Writer, opts AVIFDecodeOptions) error
 ```
+
+### API設計の原則
+
+1. **入出力の一貫性**: 入力と出力の型を統一（Bytes同士、File同士、Stream同士）
+2. **関数名の明確さ**: 関数名のサフィックスで入出力の型が分かる
+3. **ジェネリクス不使用**: 型安全性とシンプルさを両立
+4. **エラーハンドリング**: すべての関数がerrorを返す
+5. **オプション構造体**: 各フォーマット固有のオプションを型安全に扱う
 
 ### 共通型定義
 
@@ -449,46 +495,44 @@ func (img *DecodedImage) IsHighBitDepth() bool {
 
 ## CGOビルドタグとリンク設定
 
-完全な依存関係のクロージャを含む静的リンク設定。
+**重要**: libnextimage.aは全ての依存ライブラリを含む完全なクロージャです。
+libtoolまたはar MRIスクリプトにより、以下のライブラリが統合されています:
+- libnextimage (本体)
+- libwebp, libwebpdemux, libsharpyuv (WebP関連)
+- libavif_internal (AVIF本体)
+- libaom (AV1コーデック)
+
+そのため、Goからは**libnextimage.aのみをリンク**すれば動作します。
 
 ```go
-// +build !no_prebuilt_libs
-
 package libnextimage
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../c/include
 
-// macOS ARM64: 全依存関係を静的リンク
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64
-#cgo darwin,arm64 LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo darwin,arm64 LDFLAGS: -lavif -laom -ldav1d -lyuv -lz -lpthread -lm
+// macOS ARM64: libnextimage.aのみ + システムライブラリ
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
+#cgo darwin,arm64 LDFLAGS: -framework CoreFoundation
 
-// macOS Intel: 全依存関係を静的リンク
-#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64
-#cgo darwin,amd64 LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo darwin,amd64 LDFLAGS: -lavif -laom -ldav1d -lyuv -lz -lpthread -lm
+// macOS Intel: libnextimage.aのみ + システムライブラリ
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage
+#cgo darwin,amd64 LDFLAGS: -framework CoreFoundation
 
-// Linux x64: 全依存関係を静的リンク
-#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64
-#cgo linux,amd64 LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo linux,amd64 LDFLAGS: -lavif -laom -ldav1d -lyuv -lz -lpthread -lm -ldl
+// Linux x64: libnextimage.aのみ + システムライブラリ
+#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage
+#cgo linux,amd64 LDFLAGS: -lpthread -lm -ldl
 
-// Linux ARM64: 全依存関係を静的リンク
-#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64
-#cgo linux,arm64 LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo linux,arm64 LDFLAGS: -lavif -laom -ldav1d -lyuv -lz -lpthread -lm -ldl
+// Linux ARM64: libnextimage.aのみ + システムライブラリ
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage
+#cgo linux,arm64 LDFLAGS: -lpthread -lm -ldl
 
-// Windows x64: 全依存関係を静的リンク（CRTライブラリも含む）
-#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64
-#cgo windows,amd64 LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo windows,amd64 LDFLAGS: -lavif -laom -ldav1d -lyuv -lz
+// Windows x64: libnextimage.aのみ + システムライブラリ
+#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage
 #cgo windows,amd64 LDFLAGS: -lws2_32 -lkernel32 -luser32
 
 // その他のプラットフォーム: ソースからビルドされたライブラリを使用
-#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other
-#cgo !darwin,!linux,!windows LDFLAGS: -lnextimage -lwebp -lwebpdemux -lwebpmux -lsharpyuv
-#cgo !darwin,!linux,!windows LDFLAGS: -lavif -laom -ldav1d -lyuv -lz -lpthread -lm
+#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other -lnextimage
+#cgo !darwin,!linux,!windows LDFLAGS: -lpthread -lm
 
 #include "nextimage.h"
 #include "webp.h"
@@ -496,6 +540,35 @@ package libnextimage
 */
 import "C"
 ```
+
+### ライブラリ統合の仕組み
+
+**macOS/BSD**: `libtool -static`を使用
+```bash
+libtool -static -o libnextimage.a \
+  libnextimage.a libwebp.a libwebpdemux.a libsharpyuv.a \
+  libavif_internal.a libaom.a
+```
+
+**Linux**: `ar` MRIスクリプトを使用
+```bash
+cat > combine.mri <<EOF
+CREATE libnextimage.a
+ADDLIB libnextimage.a
+ADDLIB libwebp.a
+ADDLIB libwebpdemux.a
+ADDLIB libsharpyuv.a
+ADDLIB libavif_internal.a
+ADDLIB libaom.a
+SAVE
+END
+EOF
+ar -M < combine.mri
+ranlib libnextimage.a
+```
+
+この方式により、重複するオブジェクトファイル名（例: scale.c.o）の問題を回避し、
+全てのシンボルが正しく含まれることを保証します。
 
 ## 依存関係のBOM（Bill of Materials）
 
