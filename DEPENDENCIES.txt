@@ -1,0 +1,86 @@
+# libnextimage Dependencies (Bill of Materials)
+# Version: 1.0.0 (Phase 1 - Foundation)
+# Last Updated: 2025-10-18
+
+## Core Library
+libnextimage: 1.0.0
+  License: MIT
+  Purpose: FFI layer for WebP and AVIF encoding/decoding
+  Repository: https://github.com/ideamans/libnextimage
+
+## Planned Dependencies (Not Yet Integrated)
+
+### WebP Libraries
+libwebp: 1.3.2 (planned)
+  License: BSD-3-Clause
+  Repository: https://github.com/webmproject/libwebp
+  Components:
+    - libwebpdemux: WebP demuxer
+    - libwebpmux: WebP muxer
+    - libsharpyuv: YUV conversion
+
+### AVIF Libraries
+libavif: 1.0.3 (planned)
+  License: BSD-2-Clause
+  Repository: https://github.com/AOMediaCodec/libavif
+  Dependencies:
+    - libaom: 3.8.0 (planned)
+      License: BSD-2-Clause with Patent Grant
+      Purpose: AV1 encoder/decoder
+    - libdav1d: 1.3.0 (planned)
+      License: BSD-2-Clause
+      Purpose: Fast AV1 decoder
+    - libyuv: 1862 (planned)
+      License: BSD-3-Clause
+      Purpose: YUV/RGB conversion
+
+### System Dependencies
+zlib: system (planned)
+  License: zlib License
+  Purpose: Compression library
+
+## Platform-Specific System Libraries
+
+### macOS (darwin-arm64, darwin-amd64)
+- pthread: System
+- libm: System (math library)
+
+### Linux (linux-amd64, linux-arm64)
+- pthread: System
+- libm: System (math library)
+- libdl: System (dynamic linking support)
+
+### Windows (windows-amd64)
+- ws2_32: System (Windows Sockets)
+- kernel32: System
+- user32: System
+
+## Build Tools
+CMake: 3.15+ (required)
+GCC/Clang/MSVC: C11-compatible compiler (required)
+Git: For submodule management (required)
+
+## Development Phase Status
+
+Phase 1 (CURRENT): Foundation
+  - ✅ Core FFI interface (nextimage.h)
+  - ✅ Memory management infrastructure
+  - ✅ Error handling (thread-local)
+  - ✅ CMake build system (normal/ASan/UBSan)
+  - ✅ Basic tests
+  - ⏳ BOM documentation (in progress)
+
+Phase 2 (PLANNED): WebP Integration
+  - ⏳ Add libwebp as git submodule
+  - ⏳ Implement WebP FFI functions
+  - ⏳ WebP encode/decode tests
+
+Phase 3 (PLANNED): AVIF Integration
+  - ⏳ Add libavif and dependencies as git submodules
+  - ⏳ Implement AVIF FFI functions
+  - ⏳ AVIF encode/decode tests
+
+## Notes
+- This is a living document and will be updated as dependencies are added
+- All planned versions are subject to change based on compatibility testing
+- Security updates may require version bumps

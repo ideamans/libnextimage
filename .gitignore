@@ -1,0 +1,214 @@
+# libnextimage .gitignore
+
+# ========================================
+# C Build Artifacts
+# ========================================
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# C Build Directories
+c/build/
+c/build-*/
+c/cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+*.cmake
+
+# ========================================
+# Go Build Artifacts
+# ========================================
+# Binaries
+golang/*.test
+golang/*.prof
+golang/coverage.out
+golang/coverage.html
+
+# Go workspace
+golang/go.work
+golang/go.work.sum
+
+# Vendor (if used)
+golang/vendor/
+
+# ========================================
+# Test Outputs
+# ========================================
+*.log
+*.prof
+*.test
+mem.prof
+cpu.prof
+coverage.out
+coverage.html
+benchmark.txt
+
+# Test artifacts
+c/test/*.out
+c/test/sanitizer/*.out
+testdata/**/output/
+
+# ========================================
+# IDE and Editor Files
+# ========================================
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs (CLion, GoLand, etc.)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw?
+
+# Emacs
+\#*\#
+.\#*
+*~
+.dir-locals.el
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ========================================
+# macOS
+# ========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Thumbnails
+Thumbs.db
+
+# ========================================
+# Linux
+# ========================================
+*~
+.directory
+
+# ========================================
+# Windows
+# ========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ========================================
+# Temporary Files
+# ========================================
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# ========================================
+# Documentation Build
+# ========================================
+docs/_build/
+site/
+
+# ========================================
+# Platform-Specific Libraries
+# ========================================
+# Keep placeholder .gitkeep files but ignore actual libraries
+lib/darwin-arm64/*
+!lib/darwin-arm64/.gitkeep
+lib/darwin-amd64/*
+!lib/darwin-amd64/.gitkeep
+lib/linux-amd64/*
+!lib/linux-amd64/.gitkeep
+lib/linux-arm64/*
+!lib/linux-arm64/.gitkeep
+lib/windows-amd64/*
+!lib/windows-amd64/.gitkeep
+lib/other/*
+!lib/other/.gitkeep
+
+# ========================================
+# Dependencies (will be git submodules)
+# ========================================
+# Don't ignore deps/ - submodules are tracked differently
+
+# ========================================
+# CI/CD
+# ========================================
+.github/workflows/*.log
+
+# ========================================
+# Debugging and Profiling
+# ========================================
+*.dSYM/
+*.su
+*.idb
+*.pdb
+vgcore.*
+core
+core.*
+
+# Sanitizer outputs
+*.asan
+*.ubsan
+*.tsan
+*.msan
+
+# Valgrind
+*.valgrind
+vgcore.*
+
+# ========================================
+# Miscellaneous
+# ========================================
+# Environment files (local config)
+.env
+.env.local
+.env.*.local
+
+# Local notes
+NOTES.md
+TODO.local.md
+
+# Backup files
+*.backup
+*.old
+
+# Compressed files (except testdata)
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+!testdata/**/*.zip
+!testdata/**/*.tar.gz
+
+# ========================================
+# Project Specific
+# ========================================
+# Pre-release artifacts
+releases/
+
+# Local development scripts
+scripts/local_*.sh
+
+# Experimental code
+experiments/
+scratch/

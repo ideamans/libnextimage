@@ -1,0 +1,6 @@
+[submodule "libavif"]
+	path = deps/libavif
+	url = https://github.com/AOMediaCodec/libavif.git
+[submodule "deps/libwebp"]
+	path = deps/libwebp
+	url = https://github.com/webmproject/libwebp.git
