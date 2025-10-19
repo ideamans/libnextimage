@@ -2,6 +2,7 @@ package libnextimage
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -36,8 +37,9 @@ func TestWebP2GIF(t *testing.T) {
 	t.Logf("Converted to GIF: %d bytes", len(gifData))
 
 	// Optionally save for manual inspection
-	_ = os.WriteFile("/tmp/test_go_webp2gif.gif", gifData, 0644)
-	t.Log("Saved to /tmp/test_go_webp2gif.gif")
+	tempGIF := filepath.Join(os.TempDir(), "test_go_webp2gif.gif")
+	_ = os.WriteFile(tempGIF, gifData, 0644)
+	t.Logf("Saved to %s", tempGIF)
 }
 
 func TestWebP2GIF_FromFile(t *testing.T) {
@@ -47,7 +49,7 @@ func TestWebP2GIF_FromFile(t *testing.T) {
 	opts.Quality = 85
 
 	webpData, _ := WebPEncodeBytes(pngData, opts)
-	tempWebP := "/tmp/test_input.webp"
+	tempWebP := filepath.Join(os.TempDir(), "test_input.webp")
 	_ = os.WriteFile(tempWebP, webpData, 0644)
 	defer os.Remove(tempWebP)
 
@@ -93,8 +95,9 @@ func TestWebP2GIF_Transparency(t *testing.T) {
 	t.Logf("Converted transparent WebP to GIF: %d bytes", len(gifData))
 
 	// Save for manual inspection
-	_ = os.WriteFile("/tmp/test_go_webp2gif_alpha.gif", gifData, 0644)
-	t.Log("Saved to /tmp/test_go_webp2gif_alpha.gif")
+	tempGIF := filepath.Join(os.TempDir(), "test_go_webp2gif_alpha.gif")
+	_ = os.WriteFile(tempGIF, gifData, 0644)
+	t.Logf("Saved to %s", tempGIF)
 }
 
 // GIF to WebP conversion is now supported via the new command-based interface

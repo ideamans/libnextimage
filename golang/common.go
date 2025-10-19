@@ -25,6 +25,7 @@ package libnextimage
 
 // Windows x64 (MSYS2): Link to combined static library in lib/windows-amd64
 // Note: When building with MSYS2, set CGO_LDFLAGS to include MSYS2 library paths
+// libnextimage.a includes webp, avif, aom libraries but depends on system jpeg, png, gif
 #cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage
 #cgo windows,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz
 #cgo windows,amd64 LDFLAGS: -lstdc++ -lpthread -lm

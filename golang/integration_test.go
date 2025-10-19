@@ -2,6 +2,7 @@ package libnextimage
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -29,7 +30,7 @@ func TestWebPEncodeFromJPEG(t *testing.T) {
 	t.Logf("Encoded to WebP: %d bytes", len(webpData))
 
 	// Optionally save for manual inspection
-	_ = os.WriteFile("/tmp/test_go_output.webp", webpData, 0644)
+	_ = os.WriteFile(filepath.Join(os.TempDir(), "test_go_output.webp"), webpData, 0644)
 }
 
 func TestWebPEncodeFromFile(t *testing.T) {
@@ -73,7 +74,7 @@ func TestAVIFEncodeFromPNG(t *testing.T) {
 	t.Logf("Encoded to AVIF: %d bytes", len(avifData))
 
 	// Optionally save for manual inspection
-	_ = os.WriteFile("/tmp/test_go_output.avif", avifData, 0644)
+	_ = os.WriteFile(filepath.Join(os.TempDir(), "test_go_output.avif"), avifData, 0644)
 }
 
 func TestAVIFEncodeFromFile(t *testing.T) {
@@ -324,5 +325,5 @@ func TestWebP2GIFIntegration(t *testing.T) {
 	t.Logf("Converted to GIF: %d bytes (256-color quantized)", len(gifData))
 
 	// Optionally save for manual inspection
-	_ = os.WriteFile("/tmp/test_integration_webp2gif.gif", gifData, 0644)
+	_ = os.WriteFile(filepath.Join(os.TempDir(), "test_integration_webp2gif.gif"), gifData, 0644)
 }

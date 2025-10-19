@@ -298,8 +298,8 @@ func compareGIF2WebPOutputs(t *testing.T, name string, cmdOutput, libOutput []by
 	t.Logf("  library:  %d bytes", libSize)
 
 	// Save outputs for debugging
-	os.WriteFile("/tmp/cmd_"+name+".webp", cmdOutput, 0644)
-	os.WriteFile("/tmp/lib_"+name+".webp", libOutput, 0644)
+	os.WriteFile(filepath.Join(os.TempDir(), "cmd_"+name+".webp"), cmdOutput, 0644)
+	os.WriteFile(filepath.Join(os.TempDir(), "lib_"+name+".webp"), libOutput, 0644)
 
 	// バイナリ完全一致チェック
 	if bytes.Equal(cmdOutput, libOutput) {
