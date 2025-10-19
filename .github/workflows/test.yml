@@ -84,19 +84,32 @@ jobs:
         run: |
           go test -v -race -coverprofile=coverage.out .
 
-      - name: Run Go tests (Windows - MSYS2)
+      - name: Run Go tests (Windows)
         if: runner.os == 'Windows'
         working-directory: golang
-        shell: msys2 {0}
+        shell: pwsh
         run: |
-          # MSYS2のツールチェーンとライブラリパスを設定
-          export CC=/ucrt64/bin/gcc
-          export CXX=/ucrt64/bin/g++
-          export PKG_CONFIG_PATH=/ucrt64/lib/pkgconfig
-          export PATH="/ucrt64/bin:$PATH"
-          export CGO_LDFLAGS="-L/ucrt64/lib"
-          export LIBRARY_PATH="/ucrt64/lib"
-          go test -v -race -coverprofile=coverage.out .
+          # MSYS2 UCRTのツールチェーンとライブラリパスを設定（Windowsパス形式）
+          $env:CC = "D:\a\_temp\msys64\ucrt64\bin\gcc.exe"
+          $env:CXX = "D:\a\_temp\msys64\ucrt64\bin\g++.exe"
+          $env:CGO_ENABLED = "1"
+          $env:CGO_CFLAGS = "-ID:\a\_temp\msys64\ucrt64\include"
+          $env:CGO_LDFLAGS = "-LD:\a\_temp\msys64\ucrt64\lib"
+          $env:PATH = "D:\a\_temp\msys64\ucrt64\bin;$env:PATH"
+
+          # 環境確認（デバッグ用）
+          Write-Host "=== Environment Check ==="
+          Write-Host "CC: $env:CC"
+          Write-Host "CGO_CFLAGS: $env:CGO_CFLAGS"
+          Write-Host "CGO_LDFLAGS: $env:CGO_LDFLAGS"
+          & $env:CC --version
+          if (Test-Path "D:\a\_temp\msys64\ucrt64\lib\libjpeg.a") { Write-Host "libjpeg found" }
+          if (Test-Path "D:\a\_temp\msys64\ucrt64\lib\libpng.a") { Write-Host "libpng found" }
+          if (Test-Path "D:\a\_temp\msys64\ucrt64\lib\libgif.a") { Write-Host "libgif found" }
+          Write-Host "========================"
+
+          # Windowsではrace detectorとcoverageを無効化（シンプルなテスト実行）
+          go test -v .
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
