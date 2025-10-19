@@ -97,12 +97,19 @@ target_include_directories(nextimage PRIVATE
 target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
 
 # giflib のパスを探す
-find_library(GIF_LIBRARY NAMES gif PATHS /opt/homebrew/lib /usr/local/lib /usr/lib)
-find_path(GIF_INCLUDE_DIR gif_lib.h PATHS /opt/homebrew/include /usr/local/include /usr/include)
+# NO_DEFAULT_PATH を使用して、明示的に指定したパスのみを検索（Mono framework などを除外）
+find_library(GIF_LIBRARY NAMES gif
+    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+    NO_DEFAULT_PATH)
+find_path(GIF_INCLUDE_DIR gif_lib.h
+    PATHS /opt/homebrew/include /usr/local/include /usr/include
+    NO_DEFAULT_PATH)
 
 if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
     message(STATUS "Found giflib: ${GIF_LIBRARY}")
-    target_include_directories(nextimage PRIVATE ${GIF_INCLUDE_DIR})
+    message(STATUS "GIF include dir: ${GIF_INCLUDE_DIR}")
+    # BEFORE を使用して、このパスを最優先にする（Mono framework より優先）
+    target_include_directories(nextimage BEFORE PRIVATE ${GIF_INCLUDE_DIR})
 else()
     message(WARNING "giflib not found - WebP to GIF conversion will not be available")
 endif()
