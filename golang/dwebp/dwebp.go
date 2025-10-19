@@ -4,6 +4,14 @@ package dwebp
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../include
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-arm64 -lnextimage
+#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a /opt/homebrew/lib/libgif.a -lz
+#cgo darwin,arm64 LDFLAGS: -lc++ -framework CoreFoundation
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-amd64 -lnextimage
+#cgo darwin,amd64 LDFLAGS: /usr/local/lib/libjpeg.a /usr/local/lib/libpng.a /usr/local/lib/libgif.a -lz
+#cgo darwin,amd64 LDFLAGS: -lc++ -framework CoreFoundation
+#cgo linux LDFLAGS: -L${SRCDIR}/../../lib/linux-${GOARCH} -lnextimage
+#cgo linux LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
 #include <stdlib.h>
 #include <string.h>
 #include "nextimage.h"
