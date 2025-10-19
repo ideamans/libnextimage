@@ -78,9 +78,24 @@ jobs:
         run: |
           bash scripts/generate-test-images.sh
 
-      - name: Run Go tests
+      - name: Run Go tests (Unix)
+        if: runner.os != 'Windows'
         working-directory: golang
         run: |
+          go test -v -race -coverprofile=coverage.out .
+
+      - name: Run Go tests (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        working-directory: golang
+        shell: msys2 {0}
+        run: |
+          # MSYS2のツールチェーンとライブラリパスを設定
+          export CC=/ucrt64/bin/gcc
+          export CXX=/ucrt64/bin/g++
+          export PKG_CONFIG_PATH=/ucrt64/lib/pkgconfig
+          export PATH="/ucrt64/bin:$PATH"
+          export CGO_LDFLAGS="-L/ucrt64/lib"
+          export LIBRARY_PATH="/ucrt64/lib"
           go test -v -race -coverprofile=coverage.out .
 
       - name: Upload coverage
