@@ -25,6 +25,15 @@ typedef enum {
     CWEBP_HINT_GRAPH = 3     // discrete tone image (graph, map-tile)
 } CWebPImageHint;
 
+// Metadata flags (can be combined with bitwise OR)
+typedef enum {
+    CWEBP_METADATA_NONE = 0,     // No metadata (0)
+    CWEBP_METADATA_EXIF = 1,     // Keep EXIF metadata (1 << 0)
+    CWEBP_METADATA_ICC  = 2,     // Keep ICC profile (1 << 1)
+    CWEBP_METADATA_XMP  = 4,     // Keep XMP metadata (1 << 2)
+    CWEBP_METADATA_ALL  = 7      // Keep all metadata (EXIF | ICC | XMP)
+} CWebPMetadataFlag;
+
 // cwebp エンコードオプション (全WebPConfigフィールドに対応)
 typedef struct {
     // 基本設定

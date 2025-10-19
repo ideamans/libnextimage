@@ -153,6 +153,16 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
 
     // Chroma upsampling (0 = AVIF_CHROMA_UPSAMPLING_AUTOMATIC)
     options->chroma_upsampling = 0;  // Automatic (default)
+
+    // Image manipulation (disabled by default)
+    options->crop_x = 0;
+    options->crop_y = 0;
+    options->crop_width = 0;
+    options->crop_height = 0;
+    options->use_crop = 0;
+    options->resize_width = 0;
+    options->resize_height = 0;
+    options->use_resize = 0;
 }
 
 // YUV format を avifPixelFormat に変換

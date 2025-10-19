@@ -19,6 +19,15 @@ import (
 	"unsafe"
 )
 
+// Metadata flags (can be combined with bitwise OR)
+const (
+	MetadataNone = 0 // No metadata
+	MetadataEXIF = 1 // Keep EXIF metadata (1 << 0)
+	MetadataICC  = 2 // Keep ICC profile (1 << 1)
+	MetadataXMP  = 4 // Keep XMP metadata (1 << 2)
+	MetadataAll  = 7 // Keep all metadata (EXIF | ICC | XMP)
+)
+
 // Options represents WebP encoding options.
 // This corresponds to CWebPOptions in C.
 type Options struct {
@@ -48,6 +57,9 @@ type Options struct {
 	Exact            bool
 	UseDeltaPalette  bool
 	UseSharpYUV      bool
+
+	// Metadata settings
+	KeepMetadata int // Bitwise OR of MetadataEXIF, MetadataICC, MetadataXMP (e.g., MetadataEXIF | MetadataXMP)
 }
 
 // Command represents a cwebp command instance that can be reused for multiple conversions.
@@ -90,6 +102,7 @@ func NewDefaultOptions() Options {
 		Exact:            cOpts.exact != 0,
 		UseDeltaPalette:  cOpts.use_delta_palette != 0,
 		UseSharpYUV:      cOpts.use_sharp_yuv != 0,
+		KeepMetadata:     int(cOpts.keep_metadata),
 	}
 }
 
@@ -158,6 +171,9 @@ func optionsToCOptions(opts Options) *C.CWebPOptions {
 	} else {
 		cOpts.use_sharp_yuv = 0
 	}
+
+	// Metadata settings
+	cOpts.keep_metadata = C.int(opts.KeepMetadata)
 
 	return cOpts
 }

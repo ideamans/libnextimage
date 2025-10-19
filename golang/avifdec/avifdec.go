@@ -38,6 +38,17 @@ type Options struct {
 	ImageDimensionLimit  uint32       // Maximum image dimension (width or height), 0=ignore (default: 32768)
 	StrictFlags          int          // Strict validation flags: 0=disabled, 1=enabled (default: 1)
 	ChromaUpsampling     int          // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
+
+	// Image manipulation (for future implementation)
+	CropX      int  // crop rectangle x
+	CropY      int  // crop rectangle y
+	CropWidth  int  // crop rectangle width
+	CropHeight int  // crop rectangle height
+	UseCrop    bool // enable cropping
+
+	ResizeWidth  int  // resize width
+	ResizeHeight int  // resize height
+	UseResize    bool // enable resizing
 }
 
 // Command represents an AVIF decoder command that can be reused for multiple conversions
@@ -106,6 +117,14 @@ func NewDefaultOptions() Options {
 		ImageDimensionLimit: uint32(cOpts.image_dimension_limit),
 		StrictFlags:         int(cOpts.strict_flags),
 		ChromaUpsampling:    int(cOpts.chroma_upsampling),
+		CropX:               int(cOpts.crop_x),
+		CropY:               int(cOpts.crop_y),
+		CropWidth:           int(cOpts.crop_width),
+		CropHeight:          int(cOpts.crop_height),
+		UseCrop:             cOpts.use_crop != 0,
+		ResizeWidth:         int(cOpts.resize_width),
+		ResizeHeight:        int(cOpts.resize_height),
+		UseResize:           cOpts.use_resize != 0,
 	}
 }
 
@@ -145,6 +164,25 @@ func optionsToCOptions(opts Options) *C.AVIFDecOptions {
 	cOpts.image_dimension_limit = C.uint32_t(opts.ImageDimensionLimit)
 	cOpts.strict_flags = C.int(opts.StrictFlags)
 	cOpts.chroma_upsampling = C.int(opts.ChromaUpsampling)
+
+	// Image manipulation options
+	cOpts.crop_x = C.int(opts.CropX)
+	cOpts.crop_y = C.int(opts.CropY)
+	cOpts.crop_width = C.int(opts.CropWidth)
+	cOpts.crop_height = C.int(opts.CropHeight)
+	if opts.UseCrop {
+		cOpts.use_crop = 1
+	} else {
+		cOpts.use_crop = 0
+	}
+
+	cOpts.resize_width = C.int(opts.ResizeWidth)
+	cOpts.resize_height = C.int(opts.ResizeHeight)
+	if opts.UseResize {
+		cOpts.use_resize = 1
+	} else {
+		cOpts.use_resize = 0
+	}
 
 	return cOpts
 }

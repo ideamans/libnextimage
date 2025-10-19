@@ -52,12 +52,17 @@ type Options struct {
 	SharpYUV   bool // use sharp RGB->YUV conversion (default: false)
 	TargetSize int  // target file size in bytes, 0=disabled (default: 0)
 
+	// Metadata settings
+	EXIFData []byte // EXIF metadata bytes (nil=no EXIF)
+	XMPData  []byte // XMP metadata bytes (nil=no XMP)
+	ICCData  []byte // ICC profile bytes (nil=no ICC)
+
 	// Transformation settings
 	IrotAngle int // Image rotation: 0-3 (90 * angle degrees anti-clockwise), -1=disabled
 	ImirAxis  int // Image mirror: 0=vertical, 1=horizontal, -1=disabled
 
 	// Animation settings (for future use)
-	Timescale       int // timescale/fps for animations (default: 30)
+	Timescale        int // timescale/fps for animations (default: 30)
 	KeyframeInterval int // max keyframe interval (default: 0=disabled)
 }
 
@@ -164,6 +169,32 @@ func optionsToCOptions(opts Options) *C.AVIFEncOptions {
 		cOpts.sharp_yuv = 0
 	}
 	cOpts.target_size = C.int(opts.TargetSize)
+
+	// Metadata settings
+	if len(opts.EXIFData) > 0 {
+		cOpts.exif_data = (*C.uint8_t)(unsafe.Pointer(&opts.EXIFData[0]))
+		cOpts.exif_size = C.size_t(len(opts.EXIFData))
+	} else {
+		cOpts.exif_data = nil
+		cOpts.exif_size = 0
+	}
+
+	if len(opts.XMPData) > 0 {
+		cOpts.xmp_data = (*C.uint8_t)(unsafe.Pointer(&opts.XMPData[0]))
+		cOpts.xmp_size = C.size_t(len(opts.XMPData))
+	} else {
+		cOpts.xmp_data = nil
+		cOpts.xmp_size = 0
+	}
+
+	if len(opts.ICCData) > 0 {
+		cOpts.icc_data = (*C.uint8_t)(unsafe.Pointer(&opts.ICCData[0]))
+		cOpts.icc_size = C.size_t(len(opts.ICCData))
+	} else {
+		cOpts.icc_data = nil
+		cOpts.icc_size = 0
+	}
+
 	cOpts.irot_angle = C.int(opts.IrotAngle)
 	cOpts.imir_axis = C.int(opts.ImirAxis)
 	cOpts.timescale = C.int(opts.Timescale)

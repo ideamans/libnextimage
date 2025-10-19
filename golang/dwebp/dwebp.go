@@ -36,6 +36,19 @@ type Options struct {
 	BypassFiltering   bool
 	NoFancyUpsampling bool
 	UseThreads        bool
+
+	// Image manipulation
+	CropX      int  // crop rectangle x
+	CropY      int  // crop rectangle y
+	CropWidth  int  // crop rectangle width
+	CropHeight int  // crop rectangle height
+	UseCrop    bool // enable cropping
+
+	ResizeWidth  int  // resize width
+	ResizeHeight int  // resize height
+	UseResize    bool // enable resizing
+
+	Flip bool // flip vertically
 }
 
 // Command represents a dwebp command instance that can be reused for multiple conversions.
@@ -70,6 +83,15 @@ func NewDefaultOptions() Options {
 		BypassFiltering:   cOpts.bypass_filtering != 0,
 		NoFancyUpsampling: cOpts.no_fancy_upsampling != 0,
 		UseThreads:        cOpts.use_threads != 0,
+		CropX:             int(cOpts.crop_x),
+		CropY:             int(cOpts.crop_y),
+		CropWidth:         int(cOpts.crop_width),
+		CropHeight:        int(cOpts.crop_height),
+		UseCrop:           cOpts.use_crop != 0,
+		ResizeWidth:       int(cOpts.resize_width),
+		ResizeHeight:      int(cOpts.resize_height),
+		UseResize:         cOpts.use_resize != 0,
+		Flip:              cOpts.flip != 0,
 	}
 }
 
@@ -109,6 +131,31 @@ func optionsToCOptions(opts Options) *C.DWebPOptions {
 		cOpts.use_threads = 1
 	} else {
 		cOpts.use_threads = 0
+	}
+
+	// Image manipulation options
+	cOpts.crop_x = C.int(opts.CropX)
+	cOpts.crop_y = C.int(opts.CropY)
+	cOpts.crop_width = C.int(opts.CropWidth)
+	cOpts.crop_height = C.int(opts.CropHeight)
+	if opts.UseCrop {
+		cOpts.use_crop = 1
+	} else {
+		cOpts.use_crop = 0
+	}
+
+	cOpts.resize_width = C.int(opts.ResizeWidth)
+	cOpts.resize_height = C.int(opts.ResizeHeight)
+	if opts.UseResize {
+		cOpts.use_resize = 1
+	} else {
+		cOpts.use_resize = 0
+	}
+
+	if opts.Flip {
+		cOpts.flip = 1
+	} else {
+		cOpts.flip = 0
 	}
 
 	return cOpts

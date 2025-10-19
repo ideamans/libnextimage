@@ -105,6 +105,17 @@ typedef struct {
 
     // Chroma upsampling (for YUV to RGB conversion)
     int chroma_upsampling;      // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
+
+    // Image manipulation
+    int crop_x;                 // crop rectangle x
+    int crop_y;                 // crop rectangle y
+    int crop_width;             // crop rectangle width
+    int crop_height;            // crop rectangle height
+    int use_crop;               // 0 or 1, enable cropping
+
+    int resize_width;           // resize width
+    int resize_height;          // resize height
+    int use_resize;             // 0 or 1, enable resizing
 } NextImageAVIFDecodeOptions;
 
 // デフォルトオプションの取得
