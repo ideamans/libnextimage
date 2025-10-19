@@ -10,8 +10,10 @@ package dwebp
 #cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-amd64 -lnextimage
 #cgo darwin,amd64 LDFLAGS: /usr/local/lib/libjpeg.a /usr/local/lib/libpng.a /usr/local/lib/libgif.a -lz
 #cgo darwin,amd64 LDFLAGS: -lc++ -framework CoreFoundation
-#cgo linux LDFLAGS: -L${SRCDIR}/../../lib/linux-${GOARCH} -lnextimage
-#cgo linux LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
+#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../lib/linux-amd64 -lnextimage
+#cgo linux,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../lib/linux-arm64 -lnextimage
+#cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
 #include <stdlib.h>
 #include <string.h>
 #include "nextimage.h"
