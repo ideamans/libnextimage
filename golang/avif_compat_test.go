@@ -98,28 +98,19 @@ func runAVIFDec(t *testing.T, avifData []byte, args []string) []byte {
 	return data
 }
 
-// compareAVIFOutputs compares two AVIF outputs and returns true if they match
-// For AVIF, we allow slight variations due to encoder differences
+// compareAVIFOutputs compares two AVIF outputs and requires binary exact match
 func compareAVIFOutputs(t *testing.T, cmd, lib []byte) bool {
 	t.Helper()
 
-	// First try exact match
+	// バイナリ完全一致チェック
 	if bytes.Equal(cmd, lib) {
 		t.Logf("  ✓ PASSED: Binary exact match (%d bytes)", len(cmd))
 		return true
 	}
 
-	// Calculate hashes for comparison
+	// バイナリ不一致の場合は失敗
 	cmdHash := sha256.Sum256(cmd)
 	libHash := sha256.Sum256(lib)
-
-	// If hashes match, files are identical
-	if cmdHash == libHash {
-		t.Logf("  ✓ PASSED: SHA256 match (%d bytes)", len(cmd))
-		return true
-	}
-
-	// For AVIF, allow size difference up to 10% (AVIF encoding has more variation than WebP)
 	sizeDiff := len(cmd) - len(lib)
 	if sizeDiff < 0 {
 		sizeDiff = -sizeDiff
@@ -129,13 +120,7 @@ func compareAVIFOutputs(t *testing.T, cmd, lib []byte) bool {
 	t.Logf("  avifenc: %d bytes (sha256: %x...)", len(cmd), cmdHash[:4])
 	t.Logf("  library: %d bytes (sha256: %x...)", len(lib), libHash[:4])
 	t.Logf("  difference: %d bytes (%.2f%%)", sizeDiff, sizePercent)
-
-	if sizePercent <= 10.0 {
-		t.Logf("  ✓ PASSED: Size difference within tolerance (%.2f%% ≤ 10%%)", sizePercent)
-		return true
-	}
-
-	t.Errorf("  ✗ FAILED: Outputs differ significantly (%.2f%% > 10%%)", sizePercent)
+	t.Errorf("  ❌ FAILED: Binary mismatch")
 	return false
 }
 
@@ -326,31 +311,31 @@ func TestCompat_AVIF_EncodeYUVFormat(t *testing.T) {
 
 	testCases := []struct {
 		name      string
-		yuvFormat int
+		yuvFormat AVIFYUVFormat
 		formatStr string
 		args      []string
 	}{
 		{
 			name:      "yuv-444",
-			yuvFormat: 0,
+			yuvFormat: YUVFormat444,
 			formatStr: "444",
 			args:      []string{"-y", "444"},
 		},
 		{
 			name:      "yuv-422",
-			yuvFormat: 1,
+			yuvFormat: YUVFormat422,
 			formatStr: "422",
 			args:      []string{"-y", "422"},
 		},
 		{
 			name:      "yuv-420",
-			yuvFormat: 2,
+			yuvFormat: YUVFormat420,
 			formatStr: "420",
 			args:      []string{"-y", "420"},
 		},
 		{
 			name:      "yuv-400",
-			yuvFormat: 3,
+			yuvFormat: YUVFormat400,
 			formatStr: "400",
 			args:      []string{"-y", "400"},
 		},
@@ -582,19 +567,19 @@ func TestCompat_AVIF_YUVRange(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		yuvRange int
+		yuvRange AVIFYUVRange
 		rangeStr string
 		args     []string
 	}{
 		{
 			name:     "range-full",
-			yuvRange: 1,
+			yuvRange: YUVRangeFull,
 			rangeStr: "full",
 			args:     []string{"-r", "full"},
 		},
 		{
 			name:     "range-limited",
-			yuvRange: 0,
+			yuvRange: YUVRangeLimited,
 			rangeStr: "limited",
 			args:     []string{"-r", "limited"},
 		},
@@ -830,33 +815,38 @@ func TestCompat_AVIF_Transformations(t *testing.T) {
 	testCases := []struct {
 		name      string
 		irotAngle int
-		imirAxis  int
+		imirAxis  AVIFMirrorAxis
 		args      []string
 	}{
 		{
 			name:      "irot-90",
 			irotAngle: 1,
+			imirAxis:  MirrorAxisNone,
 			args:      []string{"--irot", "1"},
 		},
 		{
 			name:      "irot-180",
 			irotAngle: 2,
+			imirAxis:  MirrorAxisNone,
 			args:      []string{"--irot", "2"},
 		},
 		{
 			name:      "irot-270",
 			irotAngle: 3,
+			imirAxis:  MirrorAxisNone,
 			args:      []string{"--irot", "3"},
 		},
 		{
-			name:     "imir-vertical",
-			imirAxis: 0,
-			args:     []string{"--imir", "0"},
+			name:      "imir-vertical",
+			irotAngle: 0,
+			imirAxis:  MirrorAxisVertical,
+			args:      []string{"--imir", "0"},
 		},
 		{
-			name:     "imir-horizontal",
-			imirAxis: 1,
-			args:     []string{"--imir", "1"},
+			name:      "imir-horizontal",
+			irotAngle: 0,
+			imirAxis:  MirrorAxisHorizontal,
+			args:      []string{"--imir", "1"},
 		},
 	}
 
@@ -874,7 +864,7 @@ func TestCompat_AVIF_Transformations(t *testing.T) {
 			if tc.irotAngle > 0 {
 				opts.IRotAngle = tc.irotAngle
 			}
-			if tc.imirAxis >= 0 {
+			if tc.imirAxis != MirrorAxisNone {
 				opts.IMirAxis = tc.imirAxis
 			}
 

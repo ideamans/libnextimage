@@ -33,12 +33,12 @@ void test_buffer_allocation(void) {
     printf("\nTesting buffer allocation...\n");
 
     // エンコードバッファのテスト
-    NextImageEncodeBuffer enc_buf = {0};
+    NextImageBuffer enc_buf = {0};
     enc_buf.data = NULL;
     enc_buf.size = 0;
 
     // 解放（NULLでも安全）
-    nextimage_free_encode_buffer(&enc_buf);
+    nextimage_free_buffer(&enc_buf);
     printf("  ✓ Free NULL encode buffer is safe\n");
 
     // デコードバッファのテスト

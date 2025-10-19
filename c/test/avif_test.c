@@ -41,7 +41,7 @@ int main(void) {
     printf("Default encode options: quality=%d, speed=%d, bit_depth=%d\n",
            enc_opts.quality, enc_opts.speed, enc_opts.bit_depth);
 
-    NextImageEncodeBuffer avif_buf;
+    NextImageBuffer avif_buf;
     NextImageStatus status = nextimage_avif_encode_alloc(
         rgba_data, rgba_size,
         width, height,
@@ -72,7 +72,7 @@ int main(void) {
 
     if (status != NEXTIMAGE_OK) {
         fprintf(stderr, "AVIF decoding failed: %s\n", nextimage_last_error_message());
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -86,7 +86,7 @@ int main(void) {
         fprintf(stderr, "✗ Dimension mismatch: expected %dx%d, got %dx%d\n",
                 width, height, decoded.width, decoded.height);
         nextimage_free_decode_buffer(&decoded);
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -104,7 +104,7 @@ int main(void) {
     if (status != NEXTIMAGE_OK) {
         fprintf(stderr, "✗ decode_size failed: %s\n", nextimage_last_error_message());
         nextimage_free_decode_buffer(&decoded);
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -114,7 +114,7 @@ int main(void) {
     if (w != width || h != height) {
         fprintf(stderr, "✗ decode_size dimension mismatch\n");
         nextimage_free_decode_buffer(&decoded);
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -130,7 +130,7 @@ int main(void) {
     if (!user_buf.data) {
         fprintf(stderr, "✗ Failed to allocate user buffer\n");
         nextimage_free_decode_buffer(&decoded);
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -145,7 +145,7 @@ int main(void) {
         fprintf(stderr, "✗ decode_into failed: %s\n", nextimage_last_error_message());
         nextimage_free_decode_buffer(&user_buf);
         nextimage_free_decode_buffer(&decoded);
-        nextimage_free_encode_buffer(&avif_buf);
+        nextimage_free_buffer(&avif_buf);
         free(rgba_data);
         return 1;
     }
@@ -159,7 +159,7 @@ int main(void) {
         nextimage_avif_default_encode_options(&opts);
         opts.quality = qualities[i];
 
-        NextImageEncodeBuffer test_buf;
+        NextImageBuffer test_buf;
         status = nextimage_avif_encode_alloc(
             rgba_data, rgba_size,
             width, height,
@@ -172,13 +172,13 @@ int main(void) {
             fprintf(stderr, "✗ Failed to encode with quality %d\n", qualities[i]);
             nextimage_free_decode_buffer(&user_buf);
             nextimage_free_decode_buffer(&decoded);
-            nextimage_free_encode_buffer(&avif_buf);
+            nextimage_free_buffer(&avif_buf);
             free(rgba_data);
             return 1;
         }
 
         printf("  Quality %d: %zu bytes\n", qualities[i], test_buf.size);
-        nextimage_free_encode_buffer(&test_buf);
+        nextimage_free_buffer(&test_buf);
     }
     printf("✓ All quality levels work\n");
 
@@ -191,7 +191,7 @@ int main(void) {
         opts.yuv_format = fmt;
         opts.quality = 80;
 
-        NextImageEncodeBuffer test_buf;
+        NextImageBuffer test_buf;
         status = nextimage_avif_encode_alloc(
             rgba_data, rgba_size,
             width, height,
@@ -204,20 +204,20 @@ int main(void) {
             fprintf(stderr, "✗ Failed to encode with %s\n", format_names[fmt]);
             nextimage_free_decode_buffer(&user_buf);
             nextimage_free_decode_buffer(&decoded);
-            nextimage_free_encode_buffer(&avif_buf);
+            nextimage_free_buffer(&avif_buf);
             free(rgba_data);
             return 1;
         }
 
         printf("  %s: %zu bytes\n", format_names[fmt], test_buf.size);
-        nextimage_free_encode_buffer(&test_buf);
+        nextimage_free_buffer(&test_buf);
     }
     printf("✓ All YUV formats work\n");
 
     // Cleanup
     nextimage_free_decode_buffer(&user_buf);
     nextimage_free_decode_buffer(&decoded);
-    nextimage_free_encode_buffer(&avif_buf);
+    nextimage_free_buffer(&avif_buf);
     free(rgba_data);
 
     printf("\n=== All AVIF tests passed! ===\n");

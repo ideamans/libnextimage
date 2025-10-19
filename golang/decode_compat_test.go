@@ -34,7 +34,7 @@ func compareDecodeOutputs(t *testing.T, testName string, cmdPNGFile, libPNGFile 
 		return
 	}
 
-	// ピクセル単位の差分を計算
+	// ピクセル単位の差分を計算（デバッグ情報用）
 	diffCount := 0
 	maxDiff := 0
 	for i := 0; i < len(cmdPixels); i++ {
@@ -52,13 +52,7 @@ func compareDecodeOutputs(t *testing.T, testName string, cmdPNGFile, libPNGFile 
 
 	diffPercent := float64(diffCount) * 100.0 / float64(len(cmdPixels))
 	t.Logf("  Pixel differences: %d/%d (%.2f%%), max diff: %d", diffCount, len(cmdPixels), diffPercent, maxDiff)
-
-	// 許容範囲チェック（0.1%以内、最大差1以内）
-	if diffPercent <= 0.1 && maxDiff <= 1 {
-		t.Logf("  ⚠ PASSED (pixel match): Minor pixel differences within tolerance")
-	} else {
-		t.Errorf("  ❌ FAILED: Pixel difference too large (%.2f%%, max diff: %d)", diffPercent, maxDiff)
-	}
+	t.Errorf("  ❌ FAILED: Pixel data mismatch")
 }
 
 // dwebp デコード互換性テスト - 事前準備したWebPファイルを使用

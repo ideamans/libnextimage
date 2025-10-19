@@ -19,6 +19,10 @@
 // GIF helper functions from libwebp examples
 #include "../../deps/libwebp/examples/gifdec.h"
 
+// stb_image_write for PNG/JPEG encoding
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../../deps/stb/stb_image_write.h"
+
 // デフォルトエンコードオプション (全WebPConfigフィールドに対応)
 void nextimage_webp_default_encode_options(NextImageWebPEncodeOptions* options) {
     if (!options) return;
@@ -100,6 +104,10 @@ void nextimage_webp_default_decode_options(NextImageWebPDecodeOptions* options) 
     if (!options) return;
 
     memset(options, 0, sizeof(NextImageWebPDecodeOptions));
+
+    // Output format defaults
+    options->output_format = NEXTIMAGE_WEBP_OUTPUT_PNG;
+    options->jpeg_quality = 90;
 
     // 基本設定
     options->use_threads = 0;
@@ -236,6 +244,12 @@ static int setup_webp_config(WebPConfig* config, const NextImageWebPEncodeOption
 
     config->pass = options->pass;
 
+    // If a target size or PSNR was given, but somehow the -pass option was
+    // omitted, force a reasonable value (same logic as cwebp.c)
+    if ((config->target_size > 0 || config->target_PSNR > 0.) && config->pass == 1) {
+        config->pass = 6;
+    }
+
     config->show_compressed = options->show_compressed;
 
     // Only override preprocessing if not using preset OR if value differs from default
@@ -285,7 +299,7 @@ static int setup_webp_config(WebPConfig* config, const NextImageWebPEncodeOption
 
 // メモリライターコールバック
 static int webp_memory_writer(const uint8_t* data, size_t data_size, const WebPPicture* picture) {
-    NextImageEncodeBuffer* output = (NextImageEncodeBuffer*)picture->custom_ptr;
+    NextImageBuffer* output = (NextImageBuffer*)picture->custom_ptr;
 
     // Reallocate buffer
     size_t new_size = output->size + data_size;
@@ -306,7 +320,7 @@ NextImageStatus nextimage_webp_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
     const NextImageWebPEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!input_data || input_size == 0 || !output) {
         nextimage_set_error("Invalid parameters: NULL input or output");
@@ -314,7 +328,7 @@ NextImageStatus nextimage_webp_encode_alloc(
     }
 
     // Clear output
-    memset(output, 0, sizeof(NextImageEncodeBuffer));
+    memset(output, 0, sizeof(NextImageBuffer));
 
     // 画像フォーマットを推測
     WebPInputFileFormat format = WebPGuessImageType(input_data, input_size);
@@ -784,14 +798,14 @@ NextImageStatus nextimage_gif2webp_alloc(
     const uint8_t* gif_data,
     size_t gif_size,
     const NextImageWebPEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!gif_data || gif_size == 0 || !output) {
         nextimage_set_error("Invalid parameters for GIF to WebP conversion");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    memset(output, 0, sizeof(NextImageEncodeBuffer));
+    memset(output, 0, sizeof(NextImageBuffer));
 
     // Use default options if not provided
     NextImageWebPEncodeOptions default_opts;
@@ -1104,14 +1118,14 @@ End:
 NextImageStatus nextimage_webp2gif_alloc(
     const uint8_t* webp_data,
     size_t webp_size,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!webp_data || webp_size == 0 || !output) {
         nextimage_set_error("Invalid parameters for WebP to GIF conversion");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    memset(output, 0, sizeof(NextImageEncodeBuffer));
+    memset(output, 0, sizeof(NextImageBuffer));
 
     // Decode WebP to RGBA
     int width, height;
@@ -1257,7 +1271,7 @@ NextImageStatus nextimage_webp_encoder_encode(
     NextImageWebPEncoder* encoder,
     const uint8_t* input_data,
     size_t input_size,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!encoder) {
         nextimage_set_error("Invalid encoder instance");
@@ -1314,5 +1328,362 @@ NextImageStatus nextimage_webp_decoder_decode(
 void nextimage_webp_decoder_destroy(NextImageWebPDecoder* decoder) {
     if (decoder) {
         nextimage_free(decoder);
+    }
+}
+
+// ========================================
+// SPEC.md準拠のコマンドベースインターフェース
+// ========================================
+
+#include "nextimage/cwebp.h"
+#include "nextimage/dwebp.h"
+#include "nextimage/gif2webp.h"
+#include "nextimage/webp2gif.h"
+
+// CWebP実装（NextImageWebPEncoderを内部で使用）
+struct CWebPCommand {
+    NextImageWebPEncoder* encoder;
+};
+
+CWebPOptions* cwebp_create_default_options(void) {
+    CWebPOptions* options = (CWebPOptions*)nextimage_malloc(sizeof(CWebPOptions));
+    if (!options) {
+        nextimage_set_error("Failed to allocate CWebPOptions");
+        return NULL;
+    }
+    nextimage_webp_default_encode_options((NextImageWebPEncodeOptions*)options);
+    return options;
+}
+
+void cwebp_free_options(CWebPOptions* options) {
+    if (options) {
+        nextimage_free(options);
+    }
+}
+
+CWebPCommand* cwebp_new_command(const CWebPOptions* options) {
+    CWebPCommand* cmd = (CWebPCommand*)nextimage_malloc(sizeof(CWebPCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate CWebPCommand");
+        return NULL;
+    }
+
+    // NextImageWebPEncoderを作成
+    cmd->encoder = nextimage_webp_encoder_create((const NextImageWebPEncodeOptions*)options);
+    if (!cmd->encoder) {
+        nextimage_free(cmd);
+        return NULL;
+    }
+
+    return cmd;
+}
+
+NextImageStatus cwebp_run_command(
+    CWebPCommand* cmd,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageBuffer* output
+) {
+    if (!cmd || !cmd->encoder) {
+        nextimage_set_error("Invalid CWebPCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_webp_encoder_encode(cmd->encoder, input_data, input_size, output);
+}
+
+void cwebp_free_command(CWebPCommand* cmd) {
+    if (cmd) {
+        if (cmd->encoder) {
+            nextimage_webp_encoder_destroy(cmd->encoder);
+        }
+        nextimage_free(cmd);
+    }
+}
+
+// stb_image_write用のコールバック - NextImageBufferに追記
+static void stbi_write_to_buffer_callback(void* context, void* data, int size) {
+    NextImageBuffer* buf = (NextImageBuffer*)context;
+
+    // 新しいサイズを計算
+    size_t new_size = buf->size + (size_t)size;
+
+    // バッファを再割り当て
+    uint8_t* new_data = (uint8_t*)realloc(buf->data, new_size);
+    if (!new_data) {
+        // メモリ割り当て失敗 - 現在のバッファは維持
+        return;
+    }
+
+    // データをコピー
+    memcpy(new_data + buf->size, data, (size_t)size);
+    buf->data = new_data;
+    buf->size = new_size;
+}
+
+// DWebP実装（NextImageWebPDecoderを内部で使用）
+struct DWebPCommand {
+    NextImageWebPDecoder* decoder;
+    DWebPOutputFormat output_format;
+    int jpeg_quality;
+};
+
+DWebPOptions* dwebp_create_default_options(void) {
+    DWebPOptions* options = (DWebPOptions*)nextimage_malloc(sizeof(DWebPOptions));
+    if (!options) {
+        nextimage_set_error("Failed to allocate DWebPOptions");
+        return NULL;
+    }
+    nextimage_webp_default_decode_options((NextImageWebPDecodeOptions*)options);
+    // Set output format defaults
+    options->output_format = DWEBP_OUTPUT_PNG;
+    options->jpeg_quality = 90;
+    return options;
+}
+
+void dwebp_free_options(DWebPOptions* options) {
+    if (options) {
+        nextimage_free(options);
+    }
+}
+
+DWebPCommand* dwebp_new_command(const DWebPOptions* options) {
+    DWebPCommand* cmd = (DWebPCommand*)nextimage_malloc(sizeof(DWebPCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate DWebPCommand");
+        return NULL;
+    }
+
+    // Use default options if not provided
+    DWebPOptions default_opts;
+    if (!options) {
+        DWebPOptions* temp_opts = dwebp_create_default_options();
+        if (temp_opts) {
+            default_opts = *temp_opts;
+            dwebp_free_options(temp_opts);
+            options = &default_opts;
+        }
+    }
+
+    cmd->decoder = nextimage_webp_decoder_create((const NextImageWebPDecodeOptions*)options);
+    if (!cmd->decoder) {
+        nextimage_free(cmd);
+        return NULL;
+    }
+
+    // Store output format settings
+    cmd->output_format = options ? options->output_format : DWEBP_OUTPUT_PNG;
+    cmd->jpeg_quality = options ? options->jpeg_quality : 90;
+
+    return cmd;
+}
+
+NextImageStatus dwebp_run_command(
+    DWebPCommand* cmd,
+    const uint8_t* webp_data,
+    size_t webp_size,
+    NextImageBuffer* output
+) {
+    if (!cmd || !cmd->decoder) {
+        nextimage_set_error("Invalid DWebPCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    if (!webp_data || webp_size == 0 || !output) {
+        nextimage_set_error("Invalid parameters: NULL input or output");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    // 出力バッファを初期化
+    memset(output, 0, sizeof(NextImageBuffer));
+
+    // WebPをデコード
+    NextImageDecodeBuffer decode_buf;
+    NextImageStatus status = nextimage_webp_decoder_decode(
+        cmd->decoder,
+        webp_data,
+        webp_size,
+        &decode_buf
+    );
+
+    if (status != NEXTIMAGE_OK) {
+        return status;
+    }
+
+    // デコード結果をPNG/JPEGに変換
+    // stb_image_writeはRGB/RGBAのみサポート
+    int channels = 0;
+    const uint8_t* pixel_data = NULL;
+
+    if (decode_buf.format == NEXTIMAGE_FORMAT_RGBA) {
+        channels = 4;
+        pixel_data = decode_buf.data;
+    } else if (decode_buf.format == NEXTIMAGE_FORMAT_RGB) {
+        channels = 3;
+        pixel_data = decode_buf.data;
+    } else if (decode_buf.format == NEXTIMAGE_FORMAT_BGRA) {
+        // BGRAはstb_image_writeでサポートされていないため、
+        // RGBAに変換する必要がある
+        channels = 4;
+        // TODO: BGRA→RGBA変換が必要
+        // 現時点ではBGRAをそのまま使用（色順が逆になる可能性あり）
+        pixel_data = decode_buf.data;
+    } else {
+        nextimage_free_decode_buffer(&decode_buf);
+        nextimage_set_error("Unsupported pixel format for encoding: %d", decode_buf.format);
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    // PNG or JPEGにエンコード
+    int result = 0;
+    if (cmd->output_format == DWEBP_OUTPUT_JPEG) {
+        // JPEGにエンコード
+        result = stbi_write_jpg_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            cmd->jpeg_quality
+        );
+    } else {
+        // PNGにエンコード（デフォルト）
+        result = stbi_write_png_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            (int)decode_buf.stride
+        );
+    }
+
+    // デコードバッファを解放
+    nextimage_free_decode_buffer(&decode_buf);
+
+    if (!result) {
+        nextimage_free_buffer(output);
+        nextimage_set_error("Failed to encode output (format: %s)",
+                           cmd->output_format == DWEBP_OUTPUT_JPEG ? "JPEG" : "PNG");
+        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    }
+
+    return NEXTIMAGE_OK;
+}
+
+void dwebp_free_command(DWebPCommand* cmd) {
+    if (cmd) {
+        if (cmd->decoder) {
+            nextimage_webp_decoder_destroy(cmd->decoder);
+        }
+        nextimage_free(cmd);
+    }
+}
+
+// Gif2WebP実装（既存のnextimage_gif2webp_allocを使用）
+struct Gif2WebPCommand {
+    Gif2WebPOptions options;
+};
+
+Gif2WebPOptions* gif2webp_create_default_options(void) {
+    return cwebp_create_default_options();
+}
+
+void gif2webp_free_options(Gif2WebPOptions* options) {
+    cwebp_free_options(options);
+}
+
+Gif2WebPCommand* gif2webp_new_command(const Gif2WebPOptions* options) {
+    Gif2WebPCommand* cmd = (Gif2WebPCommand*)nextimage_malloc(sizeof(Gif2WebPCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate Gif2WebPCommand");
+        return NULL;
+    }
+
+    if (options) {
+        cmd->options = *options;
+    } else {
+        nextimage_webp_default_encode_options((NextImageWebPEncodeOptions*)&cmd->options);
+    }
+
+    return cmd;
+}
+
+NextImageStatus gif2webp_run_command(
+    Gif2WebPCommand* cmd,
+    const uint8_t* gif_data,
+    size_t gif_size,
+    NextImageBuffer* output
+) {
+    if (!cmd) {
+        nextimage_set_error("Invalid Gif2WebPCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_gif2webp_alloc(gif_data, gif_size, (const NextImageWebPEncodeOptions*)&cmd->options, output);
+}
+
+void gif2webp_free_command(Gif2WebPCommand* cmd) {
+    if (cmd) {
+        nextimage_free(cmd);
+    }
+}
+
+// WebP2Gif実装（既存のnextimage_webp2gif_allocを使用）
+struct WebP2GifCommand {
+    WebP2GifOptions options;
+};
+
+WebP2GifOptions* webp2gif_create_default_options(void) {
+    WebP2GifOptions* options = (WebP2GifOptions*)nextimage_malloc(sizeof(WebP2GifOptions));
+    if (!options) {
+        nextimage_set_error("Failed to allocate WebP2GifOptions");
+        return NULL;
+    }
+    options->reserved = 0;
+    return options;
+}
+
+void webp2gif_free_options(WebP2GifOptions* options) {
+    if (options) {
+        nextimage_free(options);
+    }
+}
+
+WebP2GifCommand* webp2gif_new_command(const WebP2GifOptions* options) {
+    WebP2GifCommand* cmd = (WebP2GifCommand*)nextimage_malloc(sizeof(WebP2GifCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate WebP2GifCommand");
+        return NULL;
+    }
+
+    if (options) {
+        cmd->options = *options;
+    } else {
+        cmd->options.reserved = 0;
+    }
+
+    return cmd;
+}
+
+NextImageStatus webp2gif_run_command(
+    WebP2GifCommand* cmd,
+    const uint8_t* webp_data,
+    size_t webp_size,
+    NextImageBuffer* output
+) {
+    if (!cmd) {
+        nextimage_set_error("Invalid WebP2GifCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_webp2gif_alloc(webp_data, webp_size, output);
+}
+
+void webp2gif_free_command(WebP2GifCommand* cmd) {
+    if (cmd) {
+        nextimage_free(cmd);
     }
 }

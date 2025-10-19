@@ -1,18 +1,10 @@
 package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../c/include
+#cgo CFLAGS: -I${SRCDIR}/../include
 
-// macOS ARM64: Link to static libraries in c/build
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libnextimage.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebp.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libsharpyuv.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebpdemux.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libwebpmux.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libimageioutil.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libwebp/libimagedec.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/libavif/libavif_internal.a
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../c/build/_deps/aom-build/libaom.a
+// macOS ARM64: Link to combined static library in lib/darwin-arm64
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
 #cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a /opt/homebrew/lib/libgif.a -lz
 #cgo darwin,arm64 LDFLAGS: -lc++ -framework CoreFoundation
 
@@ -139,9 +131,9 @@ func Version() string {
 }
 
 // freeEncodeBuffer safely frees an encode buffer
-func freeEncodeBuffer(buf *C.NextImageEncodeBuffer) {
+func freeEncodeBuffer(buf *C.NextImageBuffer) {
 	if buf != nil {
-		C.nextimage_free_encode_buffer(buf)
+		C.nextimage_free_buffer(buf)
 	}
 }
 

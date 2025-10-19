@@ -97,22 +97,25 @@ func TestWebP2GIF_Transparency(t *testing.T) {
 	t.Log("Saved to /tmp/test_go_webp2gif_alpha.gif")
 }
 
-// Note: GIF to WebP conversion is not supported because libwebp's imageio
-// does not recognize GIF format. Users should use dedicated tools for GIF to WebP.
-func TestGIF2WebP_NotSupported(t *testing.T) {
-	// This test verifies that GIF2WebP returns an appropriate error
+// GIF to WebP conversion is now supported via the new command-based interface
+func TestGIF2WebP(t *testing.T) {
+	// This test verifies that GIF2WebP conversion works
 	gifData, err := os.ReadFile("../testdata/gif/static.gif")
 	if err != nil {
 		t.Skip("GIF test file not available")
 	}
 
 	opts := DefaultWebPEncodeOptions()
-	_, err = GIF2WebPEncodeBytes(gifData, opts)
+	webpData, err := GIF2WebPEncodeBytes(gifData, opts)
 
-	// We expect this to fail because libwebp imageio doesn't support GIF
-	if err == nil {
-		t.Fatal("Expected GIF2WebP to fail, but it succeeded")
+	// GIF2WebP is now supported via the new interface
+	if err != nil {
+		t.Fatalf("GIF2WebP conversion failed: %v", err)
 	}
 
-	t.Logf("GIF2WebP correctly returned error: %v", err)
+	if len(webpData) == 0 {
+		t.Fatal("WebP data is empty")
+	}
+
+	t.Logf("GIF2WebP conversion successful: %d bytes GIF -> %d bytes WebP", len(gifData), len(webpData))
 }

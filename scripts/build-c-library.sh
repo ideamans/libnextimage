@@ -31,12 +31,35 @@ echo ""
 echo "=== Build complete ==="
 echo ""
 
-# 生成されたライブラリの確認
-echo "Generated libraries:"
+# 生成されたライブラリの確認（ビルドディレクトリ内）
+echo "Generated libraries in build directory:"
 find . -name "*.a" -type f ! -path "./_deps/*" | while read lib; do
     echo "  $(basename $lib): $(du -h "$lib" | cut -f1)"
 done
 
 echo ""
-echo "Note: For Go bindings, the libraries are linked directly from c/build/"
-echo "No need to copy to lib/ directory when using direct linking in common.go"
+echo "=== Installing combined library ==="
+cmake --install . --prefix "$PROJECT_ROOT"
+
+# ヘッダファイルのコピー
+echo ""
+echo "=== Installing header files ==="
+mkdir -p "$PROJECT_ROOT/include/nextimage"
+cp "$PROJECT_ROOT/c/include"/*.h "$PROJECT_ROOT/include/"
+cp "$PROJECT_ROOT/c/include/nextimage"/*.h "$PROJECT_ROOT/include/nextimage/"
+echo "Header files installed to include/"
+
+echo ""
+# 統合されたライブラリの確認
+if [ -d "$PROJECT_ROOT/lib" ]; then
+    echo "Combined libraries in lib/ directory:"
+    find "$PROJECT_ROOT/lib" -name "*.a" -type f | while read lib; do
+        platform=$(basename $(dirname "$lib"))
+        echo "  $platform/$(basename $lib): $(du -h "$lib" | cut -f1)"
+    done
+else
+    echo "Warning: lib/ directory not created. Install may have failed."
+fi
+
+echo ""
+echo "Note: Use the combined library from lib/<platform>/libnextimage.a for Go bindings"

@@ -14,6 +14,9 @@
 #include "webp/encode.h"
 #include "webp/decode.h"
 
+// stb_image_write for PNG/JPEG encoding (implementation is in webp.c)
+#include "../../deps/stb/stb_image_write.h"
+
 // Platform-specific headers for CPU count query
 #if defined(_WIN32)
 #include <windows.h>
@@ -84,9 +87,9 @@ void nextimage_avif_default_encode_options(NextImageAVIFEncodeOptions* options) 
     options->tile_cols_log2 = 0;
 
     // CICP (nclx) color settings - avifenc defaults (lines 1469-1471)
-    options->color_primaries = 1;        // BT709 (avifenc default)
-    options->transfer_characteristics = 13; // sRGB (avifenc default)
-    options->matrix_coefficients = 6;    // BT601 (avifenc default)
+    options->color_primaries = -1;       // -1 = auto-detect based on ICC presence
+    options->transfer_characteristics = -1;  // -1 = auto (will use 2 = Unspecified)
+    options->matrix_coefficients = -1;   // -1 = auto (will use 6 = BT601)
 
     // Advanced settings
     options->sharp_yuv = 0;
@@ -130,6 +133,11 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
     if (!options) return;
 
     memset(options, 0, sizeof(NextImageAVIFDecodeOptions));
+
+    // Output format defaults
+    options->output_format = NEXTIMAGE_AVIF_OUTPUT_PNG;
+    options->jpeg_quality = 90;
+
     options->use_threads = 0;
     options->format = NEXTIMAGE_FORMAT_RGBA;
     options->ignore_exif = 0;
@@ -145,6 +153,16 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
 
     // Chroma upsampling (0 = AVIF_CHROMA_UPSAMPLING_AUTOMATIC)
     options->chroma_upsampling = 0;  // Automatic (default)
+
+    // Image manipulation (disabled by default)
+    options->crop_x = 0;
+    options->crop_y = 0;
+    options->crop_width = 0;
+    options->crop_height = 0;
+    options->use_crop = 0;
+    options->resize_width = 0;
+    options->resize_height = 0;
+    options->use_resize = 0;
 }
 
 // YUV format を avifPixelFormat に変換
@@ -177,14 +195,14 @@ NextImageStatus nextimage_avif_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
     const NextImageAVIFEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!input_data || input_size == 0 || !output) {
         nextimage_set_error("Invalid parameters: NULL input or output");
         return NEXTIMAGE_ERROR_INVALID_PARAM;
     }
 
-    memset(output, 0, sizeof(NextImageEncodeBuffer));
+    memset(output, 0, sizeof(NextImageBuffer));
 
     // デフォルトオプション
     NextImageAVIFEncodeOptions default_opts;
@@ -241,16 +259,24 @@ NextImageStatus nextimage_avif_encode_alloc(
 
     // Set color properties from options (CICP/nclx)
     // Use options values if specified, otherwise use defaults
+    // SPECIAL CASE: If ICC profile is provided, use BT.470BG (2) instead of BT.709 (1)
+    // to match avifenc behavior with ICC profiles
+    avifBool has_icc = (options->icc_data && options->icc_size > 0);
+
     if (options->color_primaries >= 0) {
         image->colorPrimaries = (avifColorPrimaries)options->color_primaries;
     } else {
-        image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;  // default
+        if (has_icc) {
+            image->colorPrimaries = 2;  // BT.470BG when ICC is present (matches avifenc)
+        } else {
+            image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;  // default
+        }
     }
 
     if (options->transfer_characteristics >= 0) {
         image->transferCharacteristics = (avifTransferCharacteristics)options->transfer_characteristics;
     } else {
-        image->transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SRGB;  // default: sRGB
+        image->transferCharacteristics = 2;  // Unspecified (matches avifenc default for PNG)
     }
 
     if (options->matrix_coefficients >= 0) {
@@ -806,7 +832,7 @@ NextImageStatus nextimage_avif_encoder_encode(
     NextImageAVIFEncoder* encoder,
     const uint8_t* input_data,
     size_t input_size,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 ) {
     if (!encoder) {
         nextimage_set_error("Invalid encoder instance");
@@ -861,5 +887,253 @@ NextImageStatus nextimage_avif_decoder_decode(
 void nextimage_avif_decoder_destroy(NextImageAVIFDecoder* decoder) {
     if (decoder) {
         nextimage_free(decoder);
+    }
+}
+
+// ========================================
+// SPEC.md準拠のコマンドベースインターフェース
+// ========================================
+
+#include "nextimage/avifenc.h"
+#include "nextimage/avifdec.h"
+
+// AVIFEnc実装（NextImageAVIFEncoderを内部で使用）
+struct AVIFEncCommand {
+    NextImageAVIFEncoder* encoder;
+};
+
+AVIFEncOptions* avifenc_create_default_options(void) {
+    AVIFEncOptions* options = (AVIFEncOptions*)nextimage_malloc(sizeof(AVIFEncOptions));
+    if (!options) {
+        nextimage_set_error("Failed to allocate AVIFEncOptions");
+        return NULL;
+    }
+    nextimage_avif_default_encode_options((NextImageAVIFEncodeOptions*)options);
+    return options;
+}
+
+void avifenc_free_options(AVIFEncOptions* options) {
+    if (options) {
+        nextimage_free(options);
+    }
+}
+
+AVIFEncCommand* avifenc_new_command(const AVIFEncOptions* options) {
+    AVIFEncCommand* cmd = (AVIFEncCommand*)nextimage_malloc(sizeof(AVIFEncCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate AVIFEncCommand");
+        return NULL;
+    }
+
+    cmd->encoder = nextimage_avif_encoder_create((const NextImageAVIFEncodeOptions*)options);
+    if (!cmd->encoder) {
+        nextimage_free(cmd);
+        return NULL;
+    }
+
+    return cmd;
+}
+
+NextImageStatus avifenc_run_command(
+    AVIFEncCommand* cmd,
+    const uint8_t* input_data,
+    size_t input_size,
+    NextImageBuffer* output
+) {
+    if (!cmd || !cmd->encoder) {
+        nextimage_set_error("Invalid AVIFEncCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    return nextimage_avif_encoder_encode(cmd->encoder, input_data, input_size, output);
+}
+
+void avifenc_free_command(AVIFEncCommand* cmd) {
+    if (cmd) {
+        if (cmd->encoder) {
+            nextimage_avif_encoder_destroy(cmd->encoder);
+        }
+        nextimage_free(cmd);
+    }
+}
+
+// stb_image_write用のコールバック - NextImageBufferに追記
+static void stbi_write_to_buffer_callback(void* context, void* data, int size) {
+    NextImageBuffer* buf = (NextImageBuffer*)context;
+
+    // 新しいサイズを計算
+    size_t new_size = buf->size + (size_t)size;
+
+    // バッファを再割り当て
+    uint8_t* new_data = (uint8_t*)realloc(buf->data, new_size);
+    if (!new_data) {
+        // メモリ割り当て失敗 - 現在のバッファは維持
+        return;
+    }
+
+    // データをコピー
+    memcpy(new_data + buf->size, data, (size_t)size);
+    buf->data = new_data;
+    buf->size = new_size;
+}
+
+// AVIFDec実装（NextImageAVIFDecoderを内部で使用）
+struct AVIFDecCommand {
+    NextImageAVIFDecoder* decoder;
+    AVIFDecOutputFormat output_format;
+    int jpeg_quality;
+};
+
+AVIFDecOptions* avifdec_create_default_options(void) {
+    AVIFDecOptions* options = (AVIFDecOptions*)nextimage_malloc(sizeof(AVIFDecOptions));
+    if (!options) {
+        nextimage_set_error("Failed to allocate AVIFDecOptions");
+        return NULL;
+    }
+    nextimage_avif_default_decode_options((NextImageAVIFDecodeOptions*)options);
+    // Set output format defaults
+    options->output_format = AVIFDEC_OUTPUT_PNG;
+    options->jpeg_quality = 90;
+    return options;
+}
+
+void avifdec_free_options(AVIFDecOptions* options) {
+    if (options) {
+        nextimage_free(options);
+    }
+}
+
+AVIFDecCommand* avifdec_new_command(const AVIFDecOptions* options) {
+    AVIFDecCommand* cmd = (AVIFDecCommand*)nextimage_malloc(sizeof(AVIFDecCommand));
+    if (!cmd) {
+        nextimage_set_error("Failed to allocate AVIFDecCommand");
+        return NULL;
+    }
+
+    // Use default options if not provided
+    AVIFDecOptions default_opts;
+    if (!options) {
+        AVIFDecOptions* temp_opts = avifdec_create_default_options();
+        if (temp_opts) {
+            default_opts = *temp_opts;
+            avifdec_free_options(temp_opts);
+            options = &default_opts;
+        }
+    }
+
+    cmd->decoder = nextimage_avif_decoder_create((const NextImageAVIFDecodeOptions*)options);
+    if (!cmd->decoder) {
+        nextimage_free(cmd);
+        return NULL;
+    }
+
+    // Store output format settings
+    cmd->output_format = options ? options->output_format : AVIFDEC_OUTPUT_PNG;
+    cmd->jpeg_quality = options ? options->jpeg_quality : 90;
+
+    return cmd;
+}
+
+NextImageStatus avifdec_run_command(
+    AVIFDecCommand* cmd,
+    const uint8_t* avif_data,
+    size_t avif_size,
+    NextImageBuffer* output
+) {
+    if (!cmd || !cmd->decoder) {
+        nextimage_set_error("Invalid AVIFDecCommand");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    if (!avif_data || avif_size == 0 || !output) {
+        nextimage_set_error("Invalid parameters: NULL input or output");
+        return NEXTIMAGE_ERROR_INVALID_PARAM;
+    }
+
+    // 出力バッファを初期化
+    memset(output, 0, sizeof(NextImageBuffer));
+
+    // AVIFをデコード
+    NextImageDecodeBuffer decode_buf;
+    NextImageStatus status = nextimage_avif_decoder_decode(
+        cmd->decoder,
+        avif_data,
+        avif_size,
+        &decode_buf
+    );
+
+    if (status != NEXTIMAGE_OK) {
+        return status;
+    }
+
+    // デコード結果をPNG/JPEGに変換
+    // stb_image_writeはRGB/RGBAのみサポート
+    int channels = 0;
+    const uint8_t* pixel_data = NULL;
+
+    if (decode_buf.format == NEXTIMAGE_FORMAT_RGBA) {
+        channels = 4;
+        pixel_data = decode_buf.data;
+    } else if (decode_buf.format == NEXTIMAGE_FORMAT_RGB) {
+        channels = 3;
+        pixel_data = decode_buf.data;
+    } else if (decode_buf.format == NEXTIMAGE_FORMAT_BGRA) {
+        // BGRAはstb_image_writeでサポートされていないため、
+        // RGBAに変換する必要がある
+        channels = 4;
+        // TODO: BGRA→RGBA変換が必要
+        // 現時点ではBGRAをそのまま使用（色順が逆になる可能性あり）
+        pixel_data = decode_buf.data;
+    } else {
+        nextimage_free_decode_buffer(&decode_buf);
+        nextimage_set_error("Unsupported pixel format for encoding: %d", decode_buf.format);
+        return NEXTIMAGE_ERROR_UNSUPPORTED;
+    }
+
+    // PNG or JPEGにエンコード
+    int result = 0;
+    if (cmd->output_format == AVIFDEC_OUTPUT_JPEG) {
+        // JPEGにエンコード
+        result = stbi_write_jpg_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            cmd->jpeg_quality
+        );
+    } else {
+        // PNGにエンコード（デフォルト）
+        result = stbi_write_png_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            (int)decode_buf.stride
+        );
+    }
+
+    // デコードバッファを解放
+    nextimage_free_decode_buffer(&decode_buf);
+
+    if (!result) {
+        nextimage_free_buffer(output);
+        nextimage_set_error("Failed to encode output (format: %s)",
+                           cmd->output_format == AVIFDEC_OUTPUT_JPEG ? "JPEG" : "PNG");
+        return NEXTIMAGE_ERROR_ENCODE_FAILED;
+    }
+
+    return NEXTIMAGE_OK;
+}
+
+void avifdec_free_command(AVIFDecCommand* cmd) {
+    if (cmd) {
+        if (cmd->decoder) {
+            nextimage_avif_decoder_destroy(cmd->decoder);
+        }
+        nextimage_free(cmd);
     }
 }

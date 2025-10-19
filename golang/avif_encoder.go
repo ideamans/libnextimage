@@ -51,7 +51,7 @@ func (e *AVIFEncoder) Encode(imageFileData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("avif encoder encode: empty input data")
 	}
 
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 
 	status := C.nextimage_avif_encoder_encode(
 		e.encoder,

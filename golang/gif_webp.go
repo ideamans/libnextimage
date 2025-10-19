@@ -33,7 +33,7 @@ func GIF2WebPEncodeBytes(gifData []byte, opts WebPEncodeOptions) ([]byte, error)
 	cOpts.method = C.int(opts.Method)
 
 	// Call C function
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 	status := C.nextimage_gif2webp_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&gifData[0])),
 		C.size_t(len(gifData)),
@@ -74,7 +74,7 @@ func WebP2GIFConvertBytes(webpData []byte) ([]byte, error) {
 	clearError()
 
 	// Call C function
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 	status := C.nextimage_webp2gif_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&webpData[0])),
 		C.size_t(len(webpData)),

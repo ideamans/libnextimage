@@ -163,6 +163,7 @@ install(CODE "
                 \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\"
@@ -177,6 +178,7 @@ install(CODE "
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\\n\")
@@ -203,7 +205,7 @@ install(FILES
     include/nextimage.h
     include/webp.h
     include/avif.h
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
 # テスト有効化
@@ -299,3 +301,18 @@ if(ENABLE_ASAN OR ENABLE_UBSAN)
 
     add_test(NAME SanitizerTest COMMAND sanitizer_test)
 endif()
+
+# ヘッダーコンパイルテスト（新しいインターフェース）
+add_executable(header_test test/header_test.c)
+target_link_libraries(header_test nextimage)
+add_test(NAME HeaderTest COMMAND header_test)
+
+# コマンドインターフェーステスト（SPEC.md準拠）
+add_executable(command_interface_test test/command_interface_test.c)
+target_link_libraries(command_interface_test nextimage)
+add_test(NAME CommandInterfaceTest COMMAND command_interface_test)
+
+# デコーダーテスト（dwebp/avifdec）
+add_executable(decoder_test test/decoder_test.c)
+target_link_libraries(decoder_test nextimage)
+add_test(NAME DecoderTest COMMAND decoder_test)

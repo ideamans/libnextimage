@@ -11,6 +11,34 @@ import (
 	"unsafe"
 )
 
+// AVIFYUVFormat represents YUV format for AVIF encoding
+type AVIFYUVFormat int
+
+const (
+	YUVFormat444  AVIFYUVFormat = 0  // 4:4:4 (no chroma subsampling)
+	YUVFormat422  AVIFYUVFormat = 1  // 4:2:2 (horizontal subsampling)
+	YUVFormat420  AVIFYUVFormat = 2  // 4:2:0 (both horizontal and vertical subsampling)
+	YUVFormat400  AVIFYUVFormat = 3  // 4:0:0 (grayscale, no chroma)
+	YUVFormatAuto AVIFYUVFormat = -1 // Auto-detect from input (default)
+)
+
+// AVIFYUVRange represents YUV range for AVIF encoding
+type AVIFYUVRange int
+
+const (
+	YUVRangeLimited AVIFYUVRange = 0 // Limited range (16-235 for 8-bit)
+	YUVRangeFull    AVIFYUVRange = 1 // Full range (0-255 for 8-bit, default)
+)
+
+// AVIFMirrorAxis represents mirror axis for AVIF encoding
+type AVIFMirrorAxis int
+
+const (
+	MirrorAxisNone       AVIFMirrorAxis = -1 // No mirroring (disabled, default)
+	MirrorAxisVertical   AVIFMirrorAxis = 0  // Top-to-bottom mirroring
+	MirrorAxisHorizontal AVIFMirrorAxis = 1  // Left-to-right mirroring
+)
+
 // AVIFEncodeOptions represents AVIF encoding options
 type AVIFEncodeOptions struct {
 	// Quality settings
@@ -25,9 +53,9 @@ type AVIFEncodeOptions struct {
 	MaxQuantizerAlpha int // 0-63, default -1 (use QualityAlpha instead)
 
 	// Format settings
-	BitDepth  int // 8, 10, or 12 (default: 8)
-	YUVFormat int // 0=444, 1=422, 2=420, 3=400 (default: 444)
-	YUVRange  int // 0=limited, 1=full (default: 1=full)
+	BitDepth  int           // 8, 10, or 12 (default: 8)
+	YUVFormat AVIFYUVFormat // YUV format: 444/422/420/400 (default: 444)
+	YUVRange  AVIFYUVRange  // YUV range: limited/full (default: full)
 
 	// Alpha settings
 	EnableAlpha       bool
@@ -45,6 +73,11 @@ type AVIFEncodeOptions struct {
 	// Advanced settings
 	SharpYUV   bool // Use sharp RGB->YUV conversion
 	TargetSize int  // Target file size in bytes, 0=disabled
+	Lossless   bool // Lossless mode (sets Quality=100), default false
+
+	// Threading and tiling
+	Jobs       int  // -1=all cores, 0=auto, >0=specific thread count (default: -1)
+	AutoTiling bool // Enable automatic tiling (default: true)
 
 	// Metadata settings
 	ExifData []byte // EXIF metadata bytes (nil=no EXIF)
@@ -52,8 +85,8 @@ type AVIFEncodeOptions struct {
 	ICCData  []byte // ICC profile bytes (nil=no ICC)
 
 	// Transformation settings
-	IRotAngle int // Image rotation: 0-3 (90 * angle degrees anti-clockwise), -1=disabled
-	IMirAxis  int // Image mirror: 0=vertical, 1=horizontal, -1=disabled
+	IRotAngle int            // Image rotation: 0-3 (90 * angle degrees anti-clockwise), -1=disabled
+	IMirAxis  AVIFMirrorAxis // Image mirror: vertical/horizontal/none (default: none)
 
 	// Pixel aspect ratio (pasp) - array[2]: [h_spacing, v_spacing]
 	PASP [2]int // -1=disabled, otherwise [h_spacing, v_spacing]
@@ -87,11 +120,25 @@ const (
 
 // AVIFDecodeOptions represents AVIF decoding options
 type AVIFDecodeOptions struct {
-	UseThreads bool
-	Format     PixelFormat
-	IgnoreExif bool
-	IgnoreXMP  bool
-	IgnoreICC  bool
+	// Threading
+	Jobs int // -1=all cores (default), 0=auto, >0=specific thread count
+
+	// Output format
+	Format PixelFormat // desired pixel format (default: RGBA)
+
+	// Output quality settings (format-specific)
+	OutputDepth     int // 8 or 16 bit depth (PNG only, default: 8)
+	JPEGQuality     int // JPEG quality 0-100 (JPEG only, default: 90)
+	PNGCompressLevel int // PNG compression 0-9 (PNG only, -1=default)
+
+	// Color processing
+	RawColor bool // Output raw RGB without alpha multiplication (JPEG only, default: false)
+
+	// Metadata handling
+	IgnoreExif bool // Ignore embedded EXIF metadata
+	IgnoreXMP  bool // Ignore embedded XMP metadata
+	IgnoreICC  bool // Ignore embedded ICC profile
+	ICCData    []byte // Override ICC profile (nil=use embedded or none)
 
 	// Security limits
 	ImageSizeLimit      uint32 // Maximum image size in total pixels (default: 268435456)
@@ -102,6 +149,10 @@ type AVIFDecodeOptions struct {
 
 	// Chroma upsampling (for YUV to RGB conversion)
 	ChromaUpsampling ChromaUpsampling // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
+
+	// Image sequence/progressive handling
+	FrameIndex   int  // Frame index to decode (default: 0, -1=all frames)
+	Progressive  bool // Enable progressive AVIF processing (default: false)
 }
 
 // DefaultAVIFEncodeOptions returns default AVIF encoding options
@@ -118,8 +169,8 @@ func DefaultAVIFEncodeOptions() AVIFEncodeOptions {
 		MinQuantizerAlpha:       int(opts.min_quantizer_alpha),
 		MaxQuantizerAlpha:       int(opts.max_quantizer_alpha),
 		BitDepth:                int(opts.bit_depth),
-		YUVFormat:               int(opts.yuv_format),
-		YUVRange:                int(opts.yuv_range),
+		YUVFormat:               AVIFYUVFormat(opts.yuv_format),
+		YUVRange:                AVIFYUVRange(opts.yuv_range),
 		EnableAlpha:             opts.enable_alpha != 0,
 		PremultiplyAlpha:        opts.premultiply_alpha != 0,
 		TileRowsLog2:            int(opts.tile_rows_log2),
@@ -129,8 +180,11 @@ func DefaultAVIFEncodeOptions() AVIFEncodeOptions {
 		MatrixCoefficients:      int(opts.matrix_coefficients),
 		SharpYUV:     opts.sharp_yuv != 0,
 		TargetSize:   int(opts.target_size),
+		Lossless:     false,
+		Jobs:         -1,   // -1 = all cores (default)
+		AutoTiling:   true, // automatic tiling enabled by default
 		IRotAngle:    int(opts.irot_angle),
-		IMirAxis:     int(opts.imir_axis),
+		IMirAxis:     AVIFMirrorAxis(opts.imir_axis),
 		PASP:         [2]int{int(opts.pasp[0]), int(opts.pasp[1])},
 		Crop:         [4]int{int(opts.crop[0]), int(opts.crop[1]), int(opts.crop[2]), int(opts.crop[3])},
 		CLAP:         [8]int{int(opts.clap[0]), int(opts.clap[1]), int(opts.clap[2]), int(opts.clap[3]), int(opts.clap[4]), int(opts.clap[5]), int(opts.clap[6]), int(opts.clap[7])},
@@ -146,15 +200,39 @@ func DefaultAVIFDecodeOptions() AVIFDecodeOptions {
 	C.nextimage_avif_default_decode_options(&opts)
 
 	return AVIFDecodeOptions{
-		UseThreads:          opts.use_threads != 0,
-		Format:              PixelFormat(opts.format),
-		IgnoreExif:          opts.ignore_exif != 0,
-		IgnoreXMP:           opts.ignore_xmp != 0,
-		IgnoreICC:           opts.ignore_icc != 0,
+		// Threading
+		Jobs: -1, // -1 = all cores (default)
+
+		// Output format
+		Format: PixelFormat(opts.format),
+
+		// Output quality settings
+		OutputDepth:     8,  // default 8-bit
+		JPEGQuality:     90, // default JPEG quality
+		PNGCompressLevel: -1, // -1 = use libpng default
+
+		// Color processing
+		RawColor: false,
+
+		// Metadata handling
+		IgnoreExif: opts.ignore_exif != 0,
+		IgnoreXMP:  opts.ignore_xmp != 0,
+		IgnoreICC:  opts.ignore_icc != 0,
+		ICCData:    nil, // no override by default
+
+		// Security limits
 		ImageSizeLimit:      uint32(opts.image_size_limit),
 		ImageDimensionLimit: uint32(opts.image_dimension_limit),
-		StrictFlags:         int(opts.strict_flags),
-		ChromaUpsampling:    ChromaUpsampling(opts.chroma_upsampling),
+
+		// Validation
+		StrictFlags: int(opts.strict_flags),
+
+		// Chroma upsampling
+		ChromaUpsampling: ChromaUpsampling(opts.chroma_upsampling),
+
+		// Image sequence/progressive
+		FrameIndex:  0,     // decode first frame by default
+		Progressive: false, // progressive disabled by default
 	}
 }
 
@@ -242,11 +320,15 @@ func (opts *AVIFEncodeOptions) toCEncodeOptions() C.NextImageAVIFEncodeOptions {
 // toCDecodeOptions converts Go options to C options
 func (opts *AVIFDecodeOptions) toCDecodeOptions() C.NextImageAVIFDecodeOptions {
 	var copts C.NextImageAVIFDecodeOptions
-	if opts.UseThreads {
+
+	// Threading: Jobs field maps to use_threads (bool in C)
+	// -1 or >0 means use threads, 0 means don't use threads
+	if opts.Jobs != 0 {
 		copts.use_threads = 1
 	} else {
 		copts.use_threads = 0
 	}
+
 	copts.format = C.NextImagePixelFormat(opts.Format)
 	if opts.IgnoreExif {
 		copts.ignore_exif = 1
@@ -316,7 +398,7 @@ func AVIFEncodeBytes(
 	}
 
 	// Encode
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 	status := C.nextimage_avif_encode_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
 		C.size_t(len(imageFileData)),

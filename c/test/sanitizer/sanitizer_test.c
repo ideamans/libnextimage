@@ -27,12 +27,12 @@ void test_buffer_overflow_protection(void) {
 void test_use_after_free_protection(void) {
     printf("\nTesting use-after-free protection...\n");
 
-    NextImageEncodeBuffer buf;
+    NextImageBuffer buf;
     buf.data = malloc(100);
     buf.size = 100;
 
     // 解放
-    nextimage_free_encode_buffer(&buf);
+    nextimage_free_buffer(&buf);
 
     // buf.dataはNULLに設定されているはず
     assert(buf.data == NULL);
@@ -40,7 +40,7 @@ void test_use_after_free_protection(void) {
     printf("  ✓ Buffer is NULL after free\n");
 
     // 二重解放しても安全
-    nextimage_free_encode_buffer(&buf);
+    nextimage_free_buffer(&buf);
     printf("  ✓ Double free is safe\n");
 
     printf("  ✓ Use-after-free protection test passed\n");
@@ -50,7 +50,7 @@ void test_null_pointer_safety(void) {
     printf("\nTesting null pointer safety...\n");
 
     // NULLポインタでも安全
-    nextimage_free_encode_buffer(NULL);
+    nextimage_free_buffer(NULL);
     nextimage_free_decode_buffer(NULL);
     printf("  ✓ Free NULL pointers is safe\n");
 
