@@ -146,6 +146,11 @@ func TestRunFile(t *testing.T) {
 	inputPath := filepath.Join("..", "..", "testdata", "gif", "static.gif")
 	outputPath := filepath.Join(tmpDir, "output.webp")
 
+	// Check if test file exists
+	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
+		t.Skipf("Test GIF file not found: %v", err)
+	}
+
 	cmd, err := NewCommand(nil)
 	if err != nil {
 		t.Fatalf("Failed to create command: %v", err)
