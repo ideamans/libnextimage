@@ -23,9 +23,10 @@ package libnextimage
 #cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lgif -lz
 #cgo linux,arm64 LDFLAGS: -lpthread -lm -ldl
 
-// Windows x64: Link to combined static library in lib/windows-amd64
+// Windows x64 (MSYS2): Link to combined static library in lib/windows-amd64
 #cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage
-#cgo windows,amd64 LDFLAGS: -ljpeg -lpng -lz
+#cgo windows,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz
+#cgo windows,amd64 LDFLAGS: -lstdc++ -lpthread -lm
 #cgo windows,amd64 LDFLAGS: -lws2_32 -lkernel32 -luser32
 
 // Other platforms: Link to combined static library in lib/other

@@ -162,7 +162,7 @@ install(CODE "
     set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
     file(MAKE_DIRECTORY \"\${LIB_DIR}\")
 
-    # Use libtool to combine libraries on macOS/BSD, or ar MRI script on Linux
+    # Use libtool to combine libraries on macOS/BSD, or ar MRI script on Linux/Windows
     if(APPLE)
         # macOS: use libtool
         execute_process(
@@ -179,7 +179,7 @@ install(CODE "
                 \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
         )
     else()
-        # Linux/other: use ar MRI script
+        # Linux/Windows (MSYS2): use ar MRI script
         set(MRI_SCRIPT \"\${CMAKE_CURRENT_BINARY_DIR}/combine.mri\")
         file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${LIB_DIR}/libnextimage.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\\n\")
