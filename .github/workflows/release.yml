@@ -1,0 +1,110 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # Allow manual trigger for testing
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin-arm64
+            arch: arm64
+          - os: macos-13
+            platform: darwin-amd64  
+            arch: amd64
+          - os: ubuntu-latest
+            platform: linux-amd64
+            arch: amd64
+          - os: ubuntu-latest
+            platform: linux-arm64
+            arch: arm64
+            cross: true
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake jpeg libpng giflib
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev
+      
+      - name: Set up cross-compilation (Linux ARM64)
+        if: matrix.cross == true
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          echo "CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/.github/toolchain-linux-arm64.cmake" >> $GITHUB_ENV
+      
+      - name: Build C library
+        run: |
+          bash scripts/build-c-library.sh
+      
+      - name: Verify build
+        run: |
+          ls -lh lib/${{ matrix.platform }}/libnextimage.a
+          ls -lh include/
+      
+      - name: Package release
+        run: |
+          mkdir -p release-${{ matrix.platform }}/lib
+          mkdir -p release-${{ matrix.platform }}/include/nextimage
+          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/
+          cp include/*.h release-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
+          cd release-${{ matrix.platform }}
+          tar czf ../libnextimage-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
+          cd ..
+          ls -lh libnextimage-*.tar.gz
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libnextimage-${{ matrix.platform }}
+          path: libnextimage-*.tar.gz
+          retention-days: 7
+  
+  create-release:
+    name: Create GitHub Release
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Display structure
+        run: |
+          ls -R artifacts/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

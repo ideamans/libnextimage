@@ -163,6 +163,7 @@ install(CODE "
                 \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
+                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\"
                 \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\"
@@ -177,6 +178,7 @@ install(CODE "
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\\n\")
+        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\\n\")
         file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\\n\")
@@ -203,7 +205,7 @@ install(FILES
     include/nextimage.h
     include/webp.h
     include/avif.h
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/include
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
 # テスト有効化

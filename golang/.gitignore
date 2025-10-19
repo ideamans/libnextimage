@@ -1,0 +1,32 @@
+# Build artifacts
+c/build/
+*.o
+*.so
+*.dylib
+
+# Test outputs
+/tmp/
+*.test
+*.out
+
+# Go build cache
+golang/go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Editor backups
+*.bak
+
+# Temporary files
+*.tmp
+
+# NOTE: lib/ and include/ are NOT ignored - they contain release artifacts
+# that should be committed to git for distribution
