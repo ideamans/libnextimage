@@ -63,8 +63,8 @@ void nextimage_clear_error(void) {
     g_error_buffer[0] = '\0';
 }
 
-// エンコードバッファの解放
-void nextimage_free_encode_buffer(NextImageEncodeBuffer* buffer) {
+// バッファの解放
+void nextimage_free_buffer(NextImageBuffer* buffer) {
     if (buffer && buffer->data) {
         free(buffer->data);
         nextimage_decrement_alloc_counter();

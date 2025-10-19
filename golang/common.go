@@ -139,9 +139,9 @@ func Version() string {
 }
 
 // freeEncodeBuffer safely frees an encode buffer
-func freeEncodeBuffer(buf *C.NextImageEncodeBuffer) {
+func freeEncodeBuffer(buf *C.NextImageBuffer) {
 	if buf != nil {
-		C.nextimage_free_encode_buffer(buf)
+		C.nextimage_free_buffer(buf)
 	}
 }
 

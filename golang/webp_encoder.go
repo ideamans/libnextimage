@@ -51,7 +51,7 @@ func (e *WebPEncoder) Encode(imageFileData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("webp encoder encode: empty input data")
 	}
 
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 
 	status := C.nextimage_webp_encoder_encode(
 		e.encoder,

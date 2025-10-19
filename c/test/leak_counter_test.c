@@ -12,7 +12,7 @@ void test_leak_counter(void) {
     printf("  Initial counter: %lld\n", (long long)initial);
 
     // エンコードバッファを手動割り当て
-    NextImageEncodeBuffer enc_buf;
+    NextImageBuffer enc_buf;
     enc_buf.data = malloc(1024);
     enc_buf.size = 1024;
 

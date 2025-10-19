@@ -465,7 +465,7 @@ func WebPEncodeBytes(imageFileData []byte, opts WebPEncodeOptions) ([]byte, erro
 	}
 
 	cOpts := convertEncodeOptions(opts)
-	var encoded C.NextImageEncodeBuffer
+	var encoded C.NextImageBuffer
 
 	status := C.nextimage_webp_encode_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
@@ -617,7 +617,7 @@ func GIF2WebP(gifData []byte, opts WebPEncodeOptions) ([]byte, error) {
 	}
 
 	cOpts := convertEncodeOptions(opts)
-	var encoded C.NextImageEncodeBuffer
+	var encoded C.NextImageBuffer
 
 	status := C.nextimage_gif2webp_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&gifData[0])),
@@ -647,7 +647,7 @@ func WebP2GIF(webpData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("webp2gif: empty input data")
 	}
 
-	var encoded C.NextImageEncodeBuffer
+	var encoded C.NextImageBuffer
 
 	status := C.nextimage_webp2gif_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&webpData[0])),

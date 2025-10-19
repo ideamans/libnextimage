@@ -3,6 +3,12 @@
 
 #include "nextimage.h"
 
+// SPEC.md準拠の新しいコマンドベースインターフェース
+#include "nextimage/cwebp.h"
+#include "nextimage/dwebp.h"
+#include "nextimage/gif2webp.h"
+#include "nextimage/webp2gif.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -149,7 +155,7 @@ NextImageStatus nextimage_webp_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
     const NextImageWebPEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 );
 
 // ========================================
@@ -202,7 +208,7 @@ NextImageStatus nextimage_gif2webp_alloc(
     const uint8_t* gif_data,
     size_t gif_size,
     const NextImageWebPEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 );
 
 // ========================================
@@ -216,7 +222,7 @@ NextImageStatus nextimage_gif2webp_alloc(
 NextImageStatus nextimage_webp2gif_alloc(
     const uint8_t* webp_data,
     size_t webp_size,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 );
 
 // ========================================
@@ -241,7 +247,7 @@ NextImageStatus nextimage_webp_encoder_encode(
     NextImageWebPEncoder* encoder,
     const uint8_t* input_data,
     size_t input_size,
-    NextImageEncodeBuffer* output);
+    NextImageBuffer* output);
 
 // エンコーダーの破棄（内部メモリの解放）
 void nextimage_webp_encoder_destroy(NextImageWebPEncoder* encoder);

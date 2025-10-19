@@ -3,6 +3,10 @@
 
 #include "nextimage.h"
 
+// SPEC.md準拠の新しいコマンドベースインターフェース
+#include "nextimage/avifenc.h"
+#include "nextimage/avifdec.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -111,7 +115,7 @@ NextImageStatus nextimage_avif_encode_alloc(
     const uint8_t* input_data,
     size_t input_size,
     const NextImageAVIFEncodeOptions* options,
-    NextImageEncodeBuffer* output
+    NextImageBuffer* output
 );
 
 // ========================================
@@ -174,7 +178,7 @@ NextImageStatus nextimage_avif_encoder_encode(
     NextImageAVIFEncoder* encoder,
     const uint8_t* input_data,
     size_t input_size,
-    NextImageEncodeBuffer* output);
+    NextImageBuffer* output);
 
 // エンコーダーの破棄（内部メモリの解放）
 void nextimage_avif_encoder_destroy(NextImageAVIFEncoder* encoder);

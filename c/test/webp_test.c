@@ -79,7 +79,7 @@ void test_webp_encode_decode_rgba(void) {
     nextimage_webp_default_encode_options(&enc_opts);
     enc_opts.quality = 90.0f;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         input, width * height * 4,
         width, height,
@@ -116,7 +116,7 @@ void test_webp_encode_decode_rgba(void) {
 
     // クリーンアップ
     free(input);
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     nextimage_free_decode_buffer(&decoded);
 
     printf("  ✓ WebP encode/decode (RGBA) test passed\n");
@@ -134,7 +134,7 @@ void test_webp_encode_decode_rgb(void) {
     printf("  ✓ Generated red image: %dx%d RGB\n", width, height);
 
     // エンコード
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         input, width * height * 3,
         width, height,
@@ -165,7 +165,7 @@ void test_webp_encode_decode_rgb(void) {
 
     // クリーンアップ
     free(input);
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     nextimage_free_decode_buffer(&decoded);
 
     printf("  ✓ WebP encode/decode (RGB) test passed\n");
@@ -179,7 +179,7 @@ void test_webp_decode_size(void) {
 
     // テスト画像をエンコード
     uint8_t* input = generate_test_image_rgba(width, height);
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
 
     nextimage_webp_encode_alloc(
         input, width * height * 4,
@@ -206,7 +206,7 @@ void test_webp_decode_size(void) {
     assert(required_size == (size_t)width * height * 4);
     printf("  ✓ Size calculation: %dx%d, %zu bytes required\n", w, h, required_size);
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
 
     printf("  ✓ WebP decode size test passed\n");
 }
@@ -219,7 +219,7 @@ void test_webp_decode_into(void) {
 
     // エンコード
     uint8_t* input = generate_test_image_rgba(width, height);
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
 
     nextimage_webp_encode_alloc(
         input, width * height * 4,
@@ -255,7 +255,7 @@ void test_webp_decode_into(void) {
     printf("  ✓ Decoded into user buffer: %dx%d\n", decoded.width, decoded.height);
 
     // クリーンアップ（user_bufferは手動で解放）
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     free(user_buffer);
 
     printf("  ✓ WebP decode into buffer test passed\n");
@@ -275,7 +275,7 @@ void test_webp_lossless(void) {
     opts.lossless = 1;
     opts.quality = 100.0f;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         input, width * height * 4,
         width, height,
@@ -301,7 +301,7 @@ void test_webp_lossless(void) {
 
     // クリーンアップ
     free(input);
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     nextimage_free_decode_buffer(&decoded);
 
     printf("  ✓ WebP lossless test passed\n");
@@ -310,7 +310,7 @@ void test_webp_lossless(void) {
 void test_webp_error_handling(void) {
     printf("\nTesting WebP error handling...\n");
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageDecodeBuffer decoded = {0};
 
     // NULL入力

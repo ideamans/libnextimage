@@ -316,7 +316,7 @@ func AVIFEncodeBytes(
 	}
 
 	// Encode
-	var output C.NextImageEncodeBuffer
+	var output C.NextImageBuffer
 	status := C.nextimage_avif_encode_alloc(
 		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
 		C.size_t(len(imageFileData)),

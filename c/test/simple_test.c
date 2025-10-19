@@ -63,7 +63,7 @@ void test_webp_encode_jpeg(void) {
     nextimage_webp_default_encode_options(&opts);
     opts.quality = 80.0f;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         input_data,
         input_size,
@@ -82,7 +82,7 @@ void test_webp_encode_jpeg(void) {
     write_file("/tmp/test_output.webp", encoded.data, encoded.size);
     printf("   Saved to /tmp/test_output.webp\n");
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     printf("   WebP encode from JPEG test passed\n");
 }
 
@@ -101,7 +101,7 @@ void test_avif_encode_png(void) {
     opts.quality = 60;
     opts.speed = 8;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_avif_encode_alloc(
         input_data,
         input_size,
@@ -120,7 +120,7 @@ void test_avif_encode_png(void) {
     write_file("/tmp/test_output.avif", encoded.data, encoded.size);
     printf("   Saved to /tmp/test_output.avif\n");
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     printf("   AVIF encode from PNG test passed\n");
 }
 
@@ -135,7 +135,7 @@ void test_webp_decode(void) {
     NextImageWebPEncodeOptions enc_opts;
     nextimage_webp_default_encode_options(&enc_opts);
 
-    NextImageEncodeBuffer webp_encoded = {0};
+    NextImageBuffer webp_encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         jpeg_data,
         jpeg_size,
@@ -160,7 +160,7 @@ void test_webp_decode(void) {
         &decoded
     );
 
-    nextimage_free_encode_buffer(&webp_encoded);
+    nextimage_free_buffer(&webp_encoded);
 
     assert(status == NEXTIMAGE_OK);
     assert(decoded.data != NULL);
@@ -196,7 +196,7 @@ void test_instance_based_webp_encoder(void) {
         uint8_t* input_data = read_file(test_files[i], &input_size);
         assert(input_data != NULL);
 
-        NextImageEncodeBuffer encoded = {0};
+        NextImageBuffer encoded = {0};
         NextImageStatus status = nextimage_webp_encoder_encode(
             encoder,
             input_data,
@@ -210,7 +210,7 @@ void test_instance_based_webp_encoder(void) {
         assert(encoded.size > 0);
         printf("   Encoded %s: %zu bytes\n", test_files[i], encoded.size);
 
-        nextimage_free_encode_buffer(&encoded);
+        nextimage_free_buffer(&encoded);
     }
 
     // ������4�
@@ -236,7 +236,7 @@ void test_instance_based_avif_encoder(void) {
     uint8_t* input_data = read_file("../../testdata/png/blue.png", &input_size);
     assert(input_data != NULL);
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_avif_encoder_encode(
         encoder,
         input_data,
@@ -250,7 +250,7 @@ void test_instance_based_avif_encoder(void) {
     assert(encoded.size > 0);
     printf("   Encoded to AVIF: %zu bytes\n", encoded.size);
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
 
     // ������4�
     nextimage_avif_encoder_destroy(encoder);
@@ -271,7 +271,7 @@ void test_gif2webp(void) {
     nextimage_webp_default_encode_options(&opts);
     opts.quality = 80.0f;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_gif2webp_alloc(
         gif_data,
         gif_size,
@@ -295,7 +295,7 @@ void test_gif2webp(void) {
     write_file("/tmp/test_gif2webp.webp", encoded.data, encoded.size);
     printf("   Saved to /tmp/test_gif2webp.webp\n");
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     printf("   GIF to WebP conversion test passed\n");
 }
 
@@ -311,7 +311,7 @@ void test_gif2webp_animated(void) {
     nextimage_webp_default_encode_options(&opts);
     opts.quality = 80.0f;
 
-    NextImageEncodeBuffer encoded = {0};
+    NextImageBuffer encoded = {0};
     NextImageStatus status = nextimage_gif2webp_alloc(
         gif_data,
         gif_size,
@@ -335,7 +335,7 @@ void test_gif2webp_animated(void) {
     write_file("/tmp/test_gif2webp_animated.webp", encoded.data, encoded.size);
     printf("   Saved to /tmp/test_gif2webp_animated.webp\n");
 
-    nextimage_free_encode_buffer(&encoded);
+    nextimage_free_buffer(&encoded);
     printf("   Animated GIF to WebP conversion test passed\n");
 }
 
@@ -352,7 +352,7 @@ void test_webp2gif(void) {
     nextimage_webp_default_encode_options(&webp_opts);
     webp_opts.quality = 90.0f;
 
-    NextImageEncodeBuffer webp_encoded = {0};
+    NextImageBuffer webp_encoded = {0};
     NextImageStatus status = nextimage_webp_encode_alloc(
         png_data,
         png_size,
@@ -365,14 +365,14 @@ void test_webp2gif(void) {
     printf("   Encoded to WebP: %zu bytes\n", webp_encoded.size);
 
     // Convert WebP to GIF
-    NextImageEncodeBuffer gif_encoded = {0};
+    NextImageBuffer gif_encoded = {0};
     status = nextimage_webp2gif_alloc(
         webp_encoded.data,
         webp_encoded.size,
         &gif_encoded
     );
 
-    nextimage_free_encode_buffer(&webp_encoded);
+    nextimage_free_buffer(&webp_encoded);
 
     if (status != NEXTIMAGE_OK) {
         printf("   ERROR: WebP to GIF conversion failed with status %d\n", status);
@@ -388,7 +388,7 @@ void test_webp2gif(void) {
     write_file("/tmp/test_webp2gif.gif", gif_encoded.data, gif_encoded.size);
     printf("   Saved to /tmp/test_webp2gif.gif\n");
 
-    nextimage_free_encode_buffer(&gif_encoded);
+    nextimage_free_buffer(&gif_encoded);
     printf("   WebP to GIF conversion test passed\n");
 }
 

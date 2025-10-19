@@ -34,11 +34,12 @@ typedef enum {
     NEXTIMAGE_FORMAT_YUV444 = 5,    // YUV 4:4:4 planar
 } NextImagePixelFormat;
 
-// エンコード用バッファ（常にライブラリが割り当て）
+// 出力バッファ（画像ファイル形式のバイト列）
+// エンコード結果など、常にライブラリが割り当てる
 typedef struct {
     uint8_t* data;
     size_t size;
-} NextImageEncodeBuffer;
+} NextImageBuffer;
 
 // デコード用バッファ情報（プレーン別の詳細情報を含む）
 typedef struct {
@@ -68,8 +69,8 @@ typedef struct {
     int owns_data;              // 1ならライブラリがメモリを所有
 } NextImageDecodeBuffer;
 
-// メモリ解放（owns_data == 1の場合のみ解放される）
-void nextimage_free_encode_buffer(NextImageEncodeBuffer* buffer);
+// バッファのメモリ解放
+void nextimage_free_buffer(NextImageBuffer* buffer);
 void nextimage_free_decode_buffer(NextImageDecodeBuffer* buffer);
 
 // エラーメッセージ取得
