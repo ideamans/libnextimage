@@ -25,7 +25,9 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 # ビルド
 echo ""
 echo "=== Building nextimage library ==="
-make nextimage -j$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+# CPUコア数を取得（クロスプラットフォーム対応）
+NCPUS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+cmake --build . --target nextimage --parallel $NCPUS
 
 echo ""
 echo "=== Build complete ==="
