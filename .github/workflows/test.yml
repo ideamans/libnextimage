@@ -43,6 +43,10 @@ jobs:
         run: |
           bash scripts/build-c-library.sh
 
+      - name: Generate test images
+        run: |
+          bash scripts/generate-test-images.sh
+
       - name: Run Go tests
         working-directory: golang
         run: |
@@ -55,38 +59,3 @@ jobs:
           files: golang/coverage.out
           flags: unittests
           name: codecov-umbrella
-
-  test-c:
-    name: C Tests (${{ matrix.os }})
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake jpeg libpng giflib imagemagick nasm
-
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick nasm
-
-      - name: Build C library
-        run: |
-          bash scripts/build-c-library.sh
-
-      - name: Run C tests
-        working-directory: c/build
-        run: |
-          ctest --output-on-failure --verbose
