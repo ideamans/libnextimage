@@ -25,6 +25,8 @@ compile_commands.json
 CTestTestfile.cmake
 Testing/
 *.cmake
+# Allow toolchain files
+!.github/toolchain-*.cmake
 
 # ========================================
 # Go Build Artifacts
