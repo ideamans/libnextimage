@@ -244,6 +244,12 @@ static int setup_webp_config(WebPConfig* config, const NextImageWebPEncodeOption
 
     config->pass = options->pass;
 
+    // If a target size or PSNR was given, but somehow the -pass option was
+    // omitted, force a reasonable value (same logic as cwebp.c)
+    if ((config->target_size > 0 || config->target_PSNR > 0.) && config->pass == 1) {
+        config->pass = 6;
+    }
+
     config->show_compressed = options->show_compressed;
 
     // Only override preprocessing if not using preset OR if value differs from default

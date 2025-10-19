@@ -14,37 +14,37 @@ func TestCompat_WebP_Preset(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		preset int
+		preset WebPPreset
 		args   []string
 	}{
 		{
 			name:   "preset-default",
-			preset: int(PresetDefault),
+			preset: PresetDefault,
 			args:   []string{"-preset", "default"},
 		},
 		{
 			name:   "preset-picture",
-			preset: int(PresetPicture),
+			preset: PresetPicture,
 			args:   []string{"-preset", "picture"},
 		},
 		{
 			name:   "preset-photo",
-			preset: int(PresetPhoto),
+			preset: PresetPhoto,
 			args:   []string{"-preset", "photo"},
 		},
 		{
 			name:   "preset-drawing",
-			preset: int(PresetDrawing),
+			preset: PresetDrawing,
 			args:   []string{"-preset", "drawing"},
 		},
 		{
 			name:   "preset-icon",
-			preset: int(PresetIcon),
+			preset: PresetIcon,
 			args:   []string{"-preset", "icon"},
 		},
 		{
 			name:   "preset-text",
-			preset: int(PresetText),
+			preset: PresetText,
 			args:   []string{"-preset", "text"},
 		},
 	}
@@ -249,7 +249,7 @@ func TestCompat_WebP_FilterOptions(t *testing.T) {
 			name: "strong-filter",
 			opts: func() WebPEncodeOptions {
 				o := DefaultWebPEncodeOptions()
-				o.FilterType = 1
+				o.FilterType = FilterTypeStrong
 				return o
 			},
 			args: []string{"-strong"},
@@ -445,22 +445,21 @@ func TestCompat_WebP_Metadata(t *testing.T) {
 			opts.KeepMetadata = tc.keepMetadata
 			libOutput := webpEncodeWithLibrary(t, exifJPEG, opts)
 
-			// メタデータの場合はサイズ差が小さければOK (完全一致は難しい)
+			// バイナリ完全一致チェック
 			cmdSize := len(cmdOutput)
 			libSize := len(libOutput)
 			t.Logf("  cwebp:   %d bytes", cmdSize)
 			t.Logf("  library: %d bytes", libSize)
 
-			sizeDiff := cmdSize - libSize
-			if sizeDiff < 0 {
-				sizeDiff = -sizeDiff
-			}
-			sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
-
-			if sizeDiffPercent > 5.0 {
-				t.Errorf("Size difference too large: %.2f%%", sizeDiffPercent)
+			if bytes.Equal(cmdOutput, libOutput) {
+				t.Logf("  ✓ PASSED: Binary exact match")
 			} else {
-				t.Logf("  ✓ PASSED: Size difference within 5%% (%.2f%%)", sizeDiffPercent)
+				sizeDiff := cmdSize - libSize
+				if sizeDiff < 0 {
+					sizeDiff = -sizeDiff
+				}
+				sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
+				t.Errorf("  ❌ FAILED: Binary mismatch (size difference: %d bytes, %.2f%%)", sizeDiff, sizeDiffPercent)
 			}
 		})
 	}
@@ -472,22 +471,22 @@ func TestCompat_WebP_AlphaFiltering(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		alphaFiltering int
+		alphaFiltering WebPAlphaFilter
 		args           []string
 	}{
 		{
 			name:           "alpha-filter-none",
-			alphaFiltering: 0,
+			alphaFiltering: AlphaFilterNone,
 			args:           []string{"-alpha_filter", "none"},
 		},
 		{
 			name:           "alpha-filter-fast",
-			alphaFiltering: 1,
+			alphaFiltering: AlphaFilterFast,
 			args:           []string{"-alpha_filter", "fast"},
 		},
 		{
 			name:           "alpha-filter-best",
-			alphaFiltering: 2,
+			alphaFiltering: AlphaFilterBest,
 			args:           []string{"-alpha_filter", "best"},
 		},
 	}
@@ -641,22 +640,16 @@ func TestCompat_WebP_TargetSize(t *testing.T) {
 			t.Logf("  cwebp:   %d bytes (target: %d)", cmdSize, tc.targetSize)
 			t.Logf("  library: %d bytes (target: %d)", libSize, tc.targetSize)
 
-			// 両方ともターゲットサイズに近いことを確認
-			cmdDiff := cmdSize - tc.targetSize
-			if cmdDiff < 0 {
-				cmdDiff = -cmdDiff
-			}
-			libDiff := libSize - tc.targetSize
-			if libDiff < 0 {
-				libDiff = -libDiff
-			}
-
-			// ターゲットサイズの±20%以内であればOK
-			tolerance := tc.targetSize / 5
-			if cmdDiff > tolerance || libDiff > tolerance {
-				t.Logf("  ⚠ Size deviates from target (tolerance: ±%d bytes)", tolerance)
+			// バイナリ完全一致チェック
+			if bytes.Equal(cmdOutput, libOutput) {
+				t.Logf("  ✓ PASSED: Binary exact match")
 			} else {
-				t.Logf("  ✓ PASSED: Both outputs near target size")
+				sizeDiff := cmdSize - libSize
+				if sizeDiff < 0 {
+					sizeDiff = -sizeDiff
+				}
+				sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
+				t.Errorf("  ❌ FAILED: Binary mismatch (size difference: %d bytes, %.2f%%)", sizeDiff, sizeDiffPercent)
 			}
 		})
 	}
@@ -702,16 +695,16 @@ func TestCompat_WebP_TargetPSNR(t *testing.T) {
 			t.Logf("  cwebp:   %d bytes (target PSNR: %.1f)", cmdSize, tc.targetPSNR)
 			t.Logf("  library: %d bytes (target PSNR: %.1f)", libSize, tc.targetPSNR)
 
-			sizeDiff := cmdSize - libSize
-			if sizeDiff < 0 {
-				sizeDiff = -sizeDiff
-			}
-			sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
-
-			if sizeDiffPercent > 30.0 {
-				t.Logf("  ⚠ Size difference: %.2f%% (may be acceptable for PSNR target)", sizeDiffPercent)
+			// バイナリ完全一致チェック
+			if bytes.Equal(cmdOutput, libOutput) {
+				t.Logf("  ✓ PASSED: Binary exact match")
 			} else {
-				t.Logf("  ✓ PASSED: Size difference within 30%% (%.2f%%)", sizeDiffPercent)
+				sizeDiff := cmdSize - libSize
+				if sizeDiff < 0 {
+					sizeDiff = -sizeDiff
+				}
+				sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
+				t.Errorf("  ❌ FAILED: Binary mismatch (size difference: %d bytes, %.2f%%)", sizeDiff, sizeDiffPercent)
 			}
 		})
 	}

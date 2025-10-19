@@ -33,6 +33,41 @@ const (
 	HintGraph   WebPImageHint = 3 // discrete tone image (graph, map-tile)
 )
 
+// WebPFilterType represents filter type for WebP encoding
+type WebPFilterType int
+
+const (
+	FilterTypeSimple WebPFilterType = 0 // simple filter
+	FilterTypeStrong WebPFilterType = 1 // strong filter (default)
+)
+
+// WebPAlphaFilter represents alpha filtering method for WebP encoding
+type WebPAlphaFilter int
+
+const (
+	AlphaFilterNone WebPAlphaFilter = 0 // no alpha filtering
+	AlphaFilterFast WebPAlphaFilter = 1 // fast alpha filtering (default)
+	AlphaFilterBest WebPAlphaFilter = 2 // best alpha filtering
+)
+
+// WebPResizeMode represents resize behavior for WebP encoding
+type WebPResizeMode int
+
+const (
+	ResizeModeAlways   WebPResizeMode = 0 // always resize (default)
+	ResizeModeUpOnly   WebPResizeMode = 1 // resize only if upscaling
+	ResizeModeDownOnly WebPResizeMode = 2 // resize only if downscaling
+)
+
+// WebPMetadata represents metadata preservation flags (bitflags)
+const (
+	MetadataNone = 0
+	MetadataEXIF = 1 << 0 // 1 - preserve EXIF metadata
+	MetadataICC  = 1 << 1 // 2 - preserve ICC profile
+	MetadataXMP  = 1 << 2 // 4 - preserve XMP metadata
+	MetadataAll  = MetadataEXIF | MetadataICC | MetadataXMP // 7 - preserve all metadata
+)
+
 // WebPEncodeOptions represents WebP encoding options (全cwebpオプションに対応)
 type WebPEncodeOptions struct {
 	// 基本設定
@@ -41,7 +76,7 @@ type WebPEncodeOptions struct {
 	Method   int     // 0-6, default 4 (quality/speed trade-off)
 
 	// プリセット
-	Preset         int           // -1=none (default), or preset type (0-5)
+	Preset         WebPPreset    // -1=none (default), or preset type (0-5)
 	ImageHint      WebPImageHint // image type hint, default 0
 	LosslessPreset int           // -1=don't use (default), 0-9=use preset (0=fast, 9=best)
 
@@ -50,17 +85,17 @@ type WebPEncodeOptions struct {
 	TargetPSNR float32 // target PSNR (0 = disabled)
 
 	// セグメント/フィルタ設定
-	Segments        int  // 1-4, number of segments, default 4
-	SNSStrength     int  // 0-100, spatial noise shaping, default 50
-	FilterStrength  int  // 0-100, filter strength, default 60
-	FilterSharpness int  // 0-7, filter sharpness, default 0
-	FilterType      int  // 0=simple, 1=strong, default 1
-	Autofilter      bool // auto-adjust filter strength, default false
+	Segments        int            // 1-4, number of segments, default 4
+	SNSStrength     int            // 0-100, spatial noise shaping, default 50
+	FilterStrength  int            // 0-100, filter strength, default 60
+	FilterSharpness int            // 0-7, filter sharpness, default 0
+	FilterType      WebPFilterType // 0=simple, 1=strong, default 1
+	Autofilter      bool           // auto-adjust filter strength, default false
 
 	// アルファチャンネル設定
-	AlphaCompression bool // compress alpha channel, default true
-	AlphaFiltering   int  // 0=none, 1=fast, 2=best, default 1
-	AlphaQuality     int  // 0-100, alpha compression quality, default 100
+	AlphaMethod    int             // 0 or 1, transparency-compression method, default 1
+	AlphaFiltering WebPAlphaFilter // 0=none, 1=fast, 2=best, default 1
+	AlphaQuality   int             // 0-100, alpha compression quality, default 100
 
 	// エントロピー設定
 	Pass int // 1-10, entropy-analysis passes, default 1
@@ -89,9 +124,9 @@ type WebPEncodeOptions struct {
 	CropWidth  int // crop rectangle width
 	CropHeight int // crop rectangle height
 
-	ResizeWidth  int // resize width (-resize w h), -1=disabled
-	ResizeHeight int // resize height
-	ResizeMode   int // 0=always (default), 1=up_only, 2=down_only
+	ResizeWidth  int            // resize width (-resize w h), -1=disabled
+	ResizeHeight int            // resize height
+	ResizeMode   WebPResizeMode // 0=always (default), 1=up_only, 2=down_only
 
 	// アルファチャンネル特殊処理
 	BlendAlpha uint32 // blend alpha against background color (0xRRGGBB), 0xFFFFFFFF=disabled
@@ -146,7 +181,7 @@ func DefaultWebPEncodeOptions() WebPEncodeOptions {
 		Method:   4,
 
 		// プリセット
-		Preset:         -1, // -1 = none (don't use preset)
+		Preset:         WebPPreset(-1), // -1 = none (don't use preset)
 		ImageHint:      HintDefault,
 		LosslessPreset: -1, // -1 = don't use preset
 
@@ -159,13 +194,13 @@ func DefaultWebPEncodeOptions() WebPEncodeOptions {
 		SNSStrength:     50,
 		FilterStrength:  60,
 		FilterSharpness: 0,
-		FilterType:      1, // strong filter
+		FilterType:      FilterTypeStrong, // strong filter
 		Autofilter:      false,
 
 		// アルファチャンネル設定
-		AlphaCompression: true,
-		AlphaFiltering:   1, // fast
-		AlphaQuality:     100,
+		AlphaMethod:    1,               // default alpha compression method
+		AlphaFiltering: AlphaFilterFast, // fast
+		AlphaQuality:   100,
 
 		// エントロピー設定
 		Pass: 1,
@@ -186,16 +221,16 @@ func DefaultWebPEncodeOptions() WebPEncodeOptions {
 		QMax:             100,
 
 		// メタデータ設定
-		KeepMetadata: -1, // -1 = default behavior
+		KeepMetadata: MetadataNone, // 0 = none by default
 
 		// 画像変換設定
 		CropX:      -1, // -1 = disabled
 		CropY:      -1,
 		CropWidth:  -1,
 		CropHeight: -1,
-		ResizeWidth:  -1, // -1 = disabled
-		ResizeHeight: -1,
-		ResizeMode:   0, // 0 = always (default)
+		ResizeWidth:  -1,                // -1 = disabled
+		ResizeHeight: -1,                // -1 = disabled
+		ResizeMode:   ResizeModeAlways, // 0 = always (default)
 
 		// アルファチャンネル特殊処理
 		BlendAlpha: 0xFFFFFFFF, // 0xFFFFFFFF = disabled
@@ -280,11 +315,7 @@ func convertEncodeOptions(opts WebPEncodeOptions) C.NextImageWebPEncodeOptions {
 	}
 
 	// アルファチャンネル設定
-	if opts.AlphaCompression {
-		cOpts.alpha_compression = 1
-	} else {
-		cOpts.alpha_compression = 0
-	}
+	cOpts.alpha_compression = C.int(opts.AlphaMethod)
 	cOpts.alpha_filtering = C.int(opts.AlphaFiltering)
 	cOpts.alpha_quality = C.int(opts.AlphaQuality)
 

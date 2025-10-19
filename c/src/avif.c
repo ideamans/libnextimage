@@ -87,9 +87,9 @@ void nextimage_avif_default_encode_options(NextImageAVIFEncodeOptions* options) 
     options->tile_cols_log2 = 0;
 
     // CICP (nclx) color settings - avifenc defaults (lines 1469-1471)
-    options->color_primaries = 1;        // BT709 (avifenc default)
-    options->transfer_characteristics = 13; // sRGB (avifenc default)
-    options->matrix_coefficients = 6;    // BT601 (avifenc default)
+    options->color_primaries = -1;       // -1 = auto-detect based on ICC presence
+    options->transfer_characteristics = -1;  // -1 = auto (will use 2 = Unspecified)
+    options->matrix_coefficients = -1;   // -1 = auto (will use 6 = BT601)
 
     // Advanced settings
     options->sharp_yuv = 0;
@@ -259,16 +259,24 @@ NextImageStatus nextimage_avif_encode_alloc(
 
     // Set color properties from options (CICP/nclx)
     // Use options values if specified, otherwise use defaults
+    // SPECIAL CASE: If ICC profile is provided, use BT.470BG (2) instead of BT.709 (1)
+    // to match avifenc behavior with ICC profiles
+    avifBool has_icc = (options->icc_data && options->icc_size > 0);
+
     if (options->color_primaries >= 0) {
         image->colorPrimaries = (avifColorPrimaries)options->color_primaries;
     } else {
-        image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;  // default
+        if (has_icc) {
+            image->colorPrimaries = 2;  // BT.470BG when ICC is present (matches avifenc)
+        } else {
+            image->colorPrimaries = AVIF_COLOR_PRIMARIES_BT709;  // default
+        }
     }
 
     if (options->transfer_characteristics >= 0) {
         image->transferCharacteristics = (avifTransferCharacteristics)options->transfer_characteristics;
     } else {
-        image->transferCharacteristics = AVIF_TRANSFER_CHARACTERISTICS_SRGB;  // default: sRGB
+        image->transferCharacteristics = 2;  // Unspecified (matches avifenc default for PNG)
     }
 
     if (options->matrix_coefficients >= 0) {

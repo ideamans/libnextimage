@@ -57,7 +57,7 @@ func TestWebPResize(t *testing.T) {
 	opts.Quality = 80
 	opts.ResizeWidth = 200
 	opts.ResizeHeight = 200
-	opts.ResizeMode = 0 // always
+	opts.ResizeMode = ResizeModeAlways // always
 
 	webpData, err := WebPEncodeBytes(inputData, opts)
 	if err != nil {
@@ -91,7 +91,7 @@ func TestWebPResizeUpOnly(t *testing.T) {
 	opts.Quality = 80
 	opts.ResizeWidth = 256
 	opts.ResizeHeight = 256
-	opts.ResizeMode = 1 // up_only
+	opts.ResizeMode = ResizeModeUpOnly // up_only
 
 	webpData, err := WebPEncodeBytes(inputData, opts)
 	if err != nil {
@@ -125,7 +125,7 @@ func TestWebPResizeDownOnly(t *testing.T) {
 	opts.Quality = 80
 	opts.ResizeWidth = 256
 	opts.ResizeHeight = 256
-	opts.ResizeMode = 2 // down_only
+	opts.ResizeMode = ResizeModeDownOnly // down_only
 
 	webpData, err := WebPEncodeBytes(inputData, opts)
 	if err != nil {
@@ -163,7 +163,7 @@ func TestWebPCropAndResize(t *testing.T) {
 	opts.CropHeight = 256
 	opts.ResizeWidth = 128
 	opts.ResizeHeight = 128
-	opts.ResizeMode = 0 // always
+	opts.ResizeMode = ResizeModeAlways // always
 
 	webpData, err := WebPEncodeBytes(inputData, opts)
 	if err != nil {

@@ -180,7 +180,7 @@ func decodeWithLibraryToFile(t *testing.T, webpFile string, pngFile string, opts
 	}
 }
 
-// バイナリまたはサイズ比較
+// バイナリ完全一致比較（CLI Clone Philosophyに基づき、バイナリ完全一致のみを合格とする）
 func compareOutputs(t *testing.T, testName string, cmdOutput, libOutput []byte) {
 	cmdSize := len(cmdOutput)
 	libSize := len(libOutput)
@@ -194,21 +194,14 @@ func compareOutputs(t *testing.T, testName string, cmdOutput, libOutput []byte) 
 		return
 	}
 
-	// サイズ差分を計算
+	// バイナリ不一致の場合は失敗
 	sizeDiff := libSize - cmdSize
 	if sizeDiff < 0 {
 		sizeDiff = -sizeDiff
 	}
 	sizeDiffPercent := float64(sizeDiff) * 100.0 / float64(cmdSize)
 
-	t.Logf("  Size difference: %d bytes (%.2f%%)", sizeDiff, sizeDiffPercent)
-
-	// ±2%の許容範囲
-	if sizeDiffPercent <= 2.0 {
-		t.Logf("  ⚠ PASSED (size match): Binary mismatch but size within tolerance")
-	} else {
-		t.Errorf("  ❌ FAILED: Size difference too large (%.2f%%)", sizeDiffPercent)
-	}
+	t.Errorf("  ❌ FAILED: Binary mismatch (size difference: %d bytes, %.2f%%)", sizeDiff, sizeDiffPercent)
 }
 
 // Quality オプションテスト
