@@ -31,13 +31,13 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake jpeg libpng giflib imagemagick
+          brew install cmake jpeg libpng giflib imagemagick nasm
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick
+          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick nasm
 
       - name: Build C library
         run: |
@@ -74,13 +74,13 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake jpeg libpng giflib imagemagick
+          brew install cmake jpeg libpng giflib imagemagick nasm
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick
+          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick nasm
 
       - name: Build C library
         run: |
