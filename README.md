@@ -213,6 +213,14 @@ The script will generate:
 
 ## Testing
 
+### Test Images
+
+All test images are committed to the repository, so no additional generation is needed. The test suite includes various image sizes and formats:
+
+- `testdata/png-source/large-2048x2048.png` (20MB) - Large image for memory and performance testing
+- `testdata/png-source/hd-1920x1080.png` (10MB) - HD resolution testing
+- Various smaller images for different test scenarios (transparency, gradients, compression, etc.)
+
 ### Go Tests
 
 ```bash

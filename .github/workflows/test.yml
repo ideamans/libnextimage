@@ -1,0 +1,92 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test-go:
+    name: Go Tests (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake jpeg libpng giflib imagemagick
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick
+
+      - name: Build C library
+        run: |
+          bash scripts/build-c-library.sh
+
+      - name: Run Go tests
+        working-directory: golang
+        run: |
+          go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: matrix.os == 'ubuntu-latest'
+        with:
+          files: golang/coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+  test-c:
+    name: C Tests (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake jpeg libpng giflib imagemagick
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev imagemagick
+
+      - name: Build C library
+        run: |
+          bash scripts/build-c-library.sh
+
+      - name: Run C tests
+        working-directory: c/build
+        run: |
+          ctest --output-on-failure --verbose

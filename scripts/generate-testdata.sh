@@ -39,13 +39,9 @@ echo "  ✓ small-128x128.png"
 magick -size 512x512 -depth 8 gradient:red-blue sizes/medium-512x512.png
 echo "  ✓ medium-512x512.png"
 
-# 大 (2048x2048)
+# 大 (2048x2048) - largest test image
 magick -size 2048x2048 plasma:fractal sizes/large-2048x2048.png
 echo "  ✓ large-2048x2048.png"
-
-# 超大 (4096x4096)
-magick -size 4096x4096 plasma: sizes/xlarge-4096x4096.png
-echo "  ✓ xlarge-4096x4096.png"
 
 # 非正方形
 magick -size 800x600 gradient:blue-red sizes/rect-800x600.png
