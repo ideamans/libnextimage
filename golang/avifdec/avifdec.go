@@ -17,17 +17,27 @@ import (
 	"unsafe"
 )
 
+// OutputFormat represents the output format for decoded images
+type OutputFormat int
+
+const (
+	OutputPNG  OutputFormat = 0 // PNG output (default)
+	OutputJPEG OutputFormat = 1 // JPEG output
+)
+
 // Options represents AVIF decoding options
 type Options struct {
-	UseThreads           bool   // enable multi-threading
-	Format               string // desired pixel format: "RGBA", "RGB", "BGRA" (default: "RGBA")
-	IgnoreExif           bool   // ignore EXIF metadata
-	IgnoreXMP            bool   // ignore XMP metadata
-	IgnoreICC            bool   // ignore ICC profile (Note: ICC profile is not returned by decode, so this has no effect)
-	ImageSizeLimit       uint32 // Maximum image size in total pixels (default: 268435456)
-	ImageDimensionLimit  uint32 // Maximum image dimension (width or height), 0=ignore (default: 32768)
-	StrictFlags          int    // Strict validation flags: 0=disabled, 1=enabled (default: 1)
-	ChromaUpsampling     int    // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
+	OutputFormat         OutputFormat // PNG or JPEG output (default: PNG)
+	JPEGQuality          int          // JPEG quality 0-100 (default: 90, only for JPEG output)
+	UseThreads           bool         // enable multi-threading
+	Format               string       // desired pixel format: "RGBA", "RGB", "BGRA" (default: "RGBA")
+	IgnoreExif           bool         // ignore EXIF metadata
+	IgnoreXMP            bool         // ignore XMP metadata
+	IgnoreICC            bool         // ignore ICC profile (Note: ICC profile is not returned by decode, so this has no effect)
+	ImageSizeLimit       uint32       // Maximum image size in total pixels (default: 268435456)
+	ImageDimensionLimit  uint32       // Maximum image dimension (width or height), 0=ignore (default: 32768)
+	StrictFlags          int          // Strict validation flags: 0=disabled, 1=enabled (default: 1)
+	ChromaUpsampling     int          // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
 }
 
 // Command represents an AVIF decoder command that can be reused for multiple conversions
@@ -69,6 +79,8 @@ func NewDefaultOptions() Options {
 	if cOpts == nil {
 		// Return hardcoded defaults if C function fails
 		return Options{
+			OutputFormat:        OutputPNG,
+			JPEGQuality:         90,
 			UseThreads:          false,
 			Format:              "RGBA",
 			IgnoreExif:          false,
@@ -83,6 +95,8 @@ func NewDefaultOptions() Options {
 	defer C.avifdec_free_options(cOpts)
 
 	return Options{
+		OutputFormat:        OutputFormat(cOpts.output_format),
+		JPEGQuality:         int(cOpts.jpeg_quality),
 		UseThreads:          cOpts.use_threads != 0,
 		Format:              pixelFormatToString(cOpts.format),
 		IgnoreExif:          cOpts.ignore_exif != 0,
@@ -101,6 +115,10 @@ func optionsToCOptions(opts Options) *C.AVIFDecOptions {
 	if cOpts == nil {
 		return nil
 	}
+
+	// Set output format options
+	cOpts.output_format = C.AVIFDecOutputFormat(opts.OutputFormat)
+	cOpts.jpeg_quality = C.int(opts.JPEGQuality)
 
 	if opts.UseThreads {
 		cOpts.use_threads = 1

@@ -7,8 +7,18 @@
 extern "C" {
 #endif
 
+// Output format enum
+typedef enum {
+    AVIFDEC_OUTPUT_PNG = 0,   // PNG output (default)
+    AVIFDEC_OUTPUT_JPEG = 1   // JPEG output
+} AVIFDecOutputFormat;
+
 // avifdec デコードオプション
 typedef struct {
+    // 出力設定
+    AVIFDecOutputFormat output_format; // PNG or JPEG output (default: PNG)
+    int jpeg_quality;                  // JPEG quality 0-100 (default: 90, only for JPEG output)
+
     int use_threads;            // 0 or 1, enable multi-threading
     NextImagePixelFormat format; // desired pixel format (default: RGBA)
     int ignore_exif;            // 0 or 1, ignore EXIF metadata

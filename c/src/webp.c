@@ -105,6 +105,10 @@ void nextimage_webp_default_decode_options(NextImageWebPDecodeOptions* options) 
 
     memset(options, 0, sizeof(NextImageWebPDecodeOptions));
 
+    // Output format defaults
+    options->output_format = NEXTIMAGE_WEBP_OUTPUT_PNG;
+    options->jpeg_quality = 90;
+
     // 基本設定
     options->use_threads = 0;
     options->bypass_filtering = 0;
@@ -1414,6 +1418,8 @@ static void stbi_write_to_buffer_callback(void* context, void* data, int size) {
 // DWebP実装（NextImageWebPDecoderを内部で使用）
 struct DWebPCommand {
     NextImageWebPDecoder* decoder;
+    DWebPOutputFormat output_format;
+    int jpeg_quality;
 };
 
 DWebPOptions* dwebp_create_default_options(void) {
@@ -1423,6 +1429,9 @@ DWebPOptions* dwebp_create_default_options(void) {
         return NULL;
     }
     nextimage_webp_default_decode_options((NextImageWebPDecodeOptions*)options);
+    // Set output format defaults
+    options->output_format = DWEBP_OUTPUT_PNG;
+    options->jpeg_quality = 90;
     return options;
 }
 
@@ -1439,11 +1448,26 @@ DWebPCommand* dwebp_new_command(const DWebPOptions* options) {
         return NULL;
     }
 
+    // Use default options if not provided
+    DWebPOptions default_opts;
+    if (!options) {
+        DWebPOptions* temp_opts = dwebp_create_default_options();
+        if (temp_opts) {
+            default_opts = *temp_opts;
+            dwebp_free_options(temp_opts);
+            options = &default_opts;
+        }
+    }
+
     cmd->decoder = nextimage_webp_decoder_create((const NextImageWebPDecodeOptions*)options);
     if (!cmd->decoder) {
         nextimage_free(cmd);
         return NULL;
     }
+
+    // Store output format settings
+    cmd->output_format = options ? options->output_format : DWEBP_OUTPUT_PNG;
+    cmd->jpeg_quality = options ? options->jpeg_quality : 90;
 
     return cmd;
 }
@@ -1480,7 +1504,7 @@ NextImageStatus dwebp_run_command(
         return status;
     }
 
-    // デコード結果をPNGに変換
+    // デコード結果をPNG/JPEGに変換
     // stb_image_writeはRGB/RGBAのみサポート
     int channels = 0;
     const uint8_t* pixel_data = NULL;
@@ -1500,27 +1524,43 @@ NextImageStatus dwebp_run_command(
         pixel_data = decode_buf.data;
     } else {
         nextimage_free_decode_buffer(&decode_buf);
-        nextimage_set_error("Unsupported pixel format for PNG encoding: %d", decode_buf.format);
+        nextimage_set_error("Unsupported pixel format for encoding: %d", decode_buf.format);
         return NEXTIMAGE_ERROR_UNSUPPORTED;
     }
 
-    // PNGにエンコード
-    int result = stbi_write_png_to_func(
-        stbi_write_to_buffer_callback,
-        output,
-        decode_buf.width,
-        decode_buf.height,
-        channels,
-        pixel_data,
-        (int)decode_buf.stride
-    );
+    // PNG or JPEGにエンコード
+    int result = 0;
+    if (cmd->output_format == DWEBP_OUTPUT_JPEG) {
+        // JPEGにエンコード
+        result = stbi_write_jpg_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            cmd->jpeg_quality
+        );
+    } else {
+        // PNGにエンコード（デフォルト）
+        result = stbi_write_png_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            (int)decode_buf.stride
+        );
+    }
 
     // デコードバッファを解放
     nextimage_free_decode_buffer(&decode_buf);
 
     if (!result) {
         nextimage_free_buffer(output);
-        nextimage_set_error("Failed to encode PNG");
+        nextimage_set_error("Failed to encode output (format: %s)",
+                           cmd->output_format == DWEBP_OUTPUT_JPEG ? "JPEG" : "PNG");
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 

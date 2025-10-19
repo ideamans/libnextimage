@@ -106,8 +106,18 @@ typedef struct {
     int loop_compatibility;    // 0 or 1, Chrome M62 compatibility mode (default: 0)
 } NextImageWebPEncodeOptions;
 
+// Output format enum for decoder (must match dwebp.h)
+typedef enum {
+    NEXTIMAGE_WEBP_OUTPUT_PNG = 0,   // PNG output (default)
+    NEXTIMAGE_WEBP_OUTPUT_JPEG = 1   // JPEG output
+} NextImageWebPOutputFormat;
+
 // WebP デコードオプション (dwebpの全オプションに対応)
 typedef struct {
+    // Output format options
+    NextImageWebPOutputFormat output_format; // PNG or JPEG output (default: PNG)
+    int jpeg_quality;                        // JPEG quality 0-100 (default: 90, only for JPEG output)
+
     // 基本設定
     int use_threads;            // 0 or 1, enable multi-threading (-mt)
     int bypass_filtering;       // 0 or 1, disable in-loop filtering (-nofilter)

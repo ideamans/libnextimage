@@ -133,6 +133,11 @@ void nextimage_avif_default_decode_options(NextImageAVIFDecodeOptions* options) 
     if (!options) return;
 
     memset(options, 0, sizeof(NextImageAVIFDecodeOptions));
+
+    // Output format defaults
+    options->output_format = NEXTIMAGE_AVIF_OUTPUT_PNG;
+    options->jpeg_quality = 90;
+
     options->use_threads = 0;
     options->format = NEXTIMAGE_FORMAT_RGBA;
     options->ignore_exif = 0;
@@ -957,6 +962,8 @@ static void stbi_write_to_buffer_callback(void* context, void* data, int size) {
 // AVIFDec実装（NextImageAVIFDecoderを内部で使用）
 struct AVIFDecCommand {
     NextImageAVIFDecoder* decoder;
+    AVIFDecOutputFormat output_format;
+    int jpeg_quality;
 };
 
 AVIFDecOptions* avifdec_create_default_options(void) {
@@ -966,6 +973,9 @@ AVIFDecOptions* avifdec_create_default_options(void) {
         return NULL;
     }
     nextimage_avif_default_decode_options((NextImageAVIFDecodeOptions*)options);
+    // Set output format defaults
+    options->output_format = AVIFDEC_OUTPUT_PNG;
+    options->jpeg_quality = 90;
     return options;
 }
 
@@ -982,11 +992,26 @@ AVIFDecCommand* avifdec_new_command(const AVIFDecOptions* options) {
         return NULL;
     }
 
+    // Use default options if not provided
+    AVIFDecOptions default_opts;
+    if (!options) {
+        AVIFDecOptions* temp_opts = avifdec_create_default_options();
+        if (temp_opts) {
+            default_opts = *temp_opts;
+            avifdec_free_options(temp_opts);
+            options = &default_opts;
+        }
+    }
+
     cmd->decoder = nextimage_avif_decoder_create((const NextImageAVIFDecodeOptions*)options);
     if (!cmd->decoder) {
         nextimage_free(cmd);
         return NULL;
     }
+
+    // Store output format settings
+    cmd->output_format = options ? options->output_format : AVIFDEC_OUTPUT_PNG;
+    cmd->jpeg_quality = options ? options->jpeg_quality : 90;
 
     return cmd;
 }
@@ -1023,7 +1048,7 @@ NextImageStatus avifdec_run_command(
         return status;
     }
 
-    // デコード結果をPNGに変換
+    // デコード結果をPNG/JPEGに変換
     // stb_image_writeはRGB/RGBAのみサポート
     int channels = 0;
     const uint8_t* pixel_data = NULL;
@@ -1043,27 +1068,43 @@ NextImageStatus avifdec_run_command(
         pixel_data = decode_buf.data;
     } else {
         nextimage_free_decode_buffer(&decode_buf);
-        nextimage_set_error("Unsupported pixel format for PNG encoding: %d", decode_buf.format);
+        nextimage_set_error("Unsupported pixel format for encoding: %d", decode_buf.format);
         return NEXTIMAGE_ERROR_UNSUPPORTED;
     }
 
-    // PNGにエンコード
-    int result = stbi_write_png_to_func(
-        stbi_write_to_buffer_callback,
-        output,
-        decode_buf.width,
-        decode_buf.height,
-        channels,
-        pixel_data,
-        (int)decode_buf.stride
-    );
+    // PNG or JPEGにエンコード
+    int result = 0;
+    if (cmd->output_format == AVIFDEC_OUTPUT_JPEG) {
+        // JPEGにエンコード
+        result = stbi_write_jpg_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            cmd->jpeg_quality
+        );
+    } else {
+        // PNGにエンコード（デフォルト）
+        result = stbi_write_png_to_func(
+            stbi_write_to_buffer_callback,
+            output,
+            decode_buf.width,
+            decode_buf.height,
+            channels,
+            pixel_data,
+            (int)decode_buf.stride
+        );
+    }
 
     // デコードバッファを解放
     nextimage_free_decode_buffer(&decode_buf);
 
     if (!result) {
         nextimage_free_buffer(output);
-        nextimage_set_error("Failed to encode PNG");
+        nextimage_set_error("Failed to encode output (format: %s)",
+                           cmd->output_format == AVIFDEC_OUTPUT_JPEG ? "JPEG" : "PNG");
         return NEXTIMAGE_ERROR_ENCODE_FAILED;
     }
 

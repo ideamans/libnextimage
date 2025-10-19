@@ -19,10 +19,20 @@ import (
 	"unsafe"
 )
 
+// OutputFormat represents the output format for decoded images
+type OutputFormat int
+
+const (
+	OutputPNG  OutputFormat = 0 // PNG output (default)
+	OutputJPEG OutputFormat = 1 // JPEG output
+)
+
 // Options represents WebP decoding options.
 // This corresponds to DWebPOptions in C.
 type Options struct {
-	Format            string // "RGBA", "RGB", "BGRA"
+	OutputFormat      OutputFormat // PNG or JPEG output (default: PNG)
+	JPEGQuality       int          // JPEG quality 0-100 (default: 90, only for JPEG output)
+	Format            string       // "RGBA", "RGB", "BGRA"
 	BypassFiltering   bool
 	NoFancyUpsampling bool
 	UseThreads        bool
@@ -37,7 +47,11 @@ type Command struct {
 func NewDefaultOptions() Options {
 	cOpts := C.dwebp_create_default_options()
 	if cOpts == nil {
-		return Options{Format: "RGBA"} // fallback defaults
+		return Options{
+			OutputFormat: OutputPNG,
+			JPEGQuality:  90,
+			Format:       "RGBA",
+		} // fallback defaults
 	}
 	defer C.dwebp_free_options(cOpts)
 
@@ -50,6 +64,8 @@ func NewDefaultOptions() Options {
 	}
 
 	return Options{
+		OutputFormat:      OutputFormat(cOpts.output_format),
+		JPEGQuality:       int(cOpts.jpeg_quality),
 		Format:            format,
 		BypassFiltering:   cOpts.bypass_filtering != 0,
 		NoFancyUpsampling: cOpts.no_fancy_upsampling != 0,
@@ -63,6 +79,10 @@ func optionsToCOptions(opts Options) *C.DWebPOptions {
 	if cOpts == nil {
 		return nil
 	}
+
+	// Set output format options
+	cOpts.output_format = C.DWebPOutputFormat(opts.OutputFormat)
+	cOpts.jpeg_quality = C.int(opts.JPEGQuality)
 
 	switch opts.Format {
 	case "RGB":

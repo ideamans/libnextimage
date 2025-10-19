@@ -7,8 +7,18 @@
 extern "C" {
 #endif
 
+// Output format enum
+typedef enum {
+    DWEBP_OUTPUT_PNG = 0,   // PNG output (default)
+    DWEBP_OUTPUT_JPEG = 1   // JPEG output
+} DWebPOutputFormat;
+
 // dwebp デコードオプション (dwebpの全オプションに対応)
 typedef struct {
+    // 出力設定
+    DWebPOutputFormat output_format; // PNG or JPEG output (default: PNG)
+    int jpeg_quality;                // JPEG quality 0-100 (default: 90, only for JPEG output)
+
     // 基本設定
     int use_threads;            // 0 or 1, enable multi-threading (-mt)
     int bypass_filtering;       // 0 or 1, disable in-loop filtering (-nofilter)
