@@ -10,17 +10,17 @@ package libnextimage
 
 // macOS Intel: Link to combined static library in lib/darwin-amd64
 #cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage
-#cgo darwin,amd64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a -lz
-#cgo darwin,amd64 LDFLAGS: -framework CoreFoundation
+#cgo darwin,amd64 LDFLAGS: /usr/local/lib/libjpeg.a /usr/local/lib/libpng.a /usr/local/lib/libgif.a -lz
+#cgo darwin,amd64 LDFLAGS: -lc++ -framework CoreFoundation
 
 // Linux x64: Link to combined static library in lib/linux-amd64
 #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage
-#cgo linux,amd64 LDFLAGS: -ljpeg -lpng -lz
+#cgo linux,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz
 #cgo linux,amd64 LDFLAGS: -lpthread -lm -ldl
 
 // Linux ARM64: Link to combined static library in lib/linux-arm64
 #cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage
-#cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lz
+#cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lgif -lz
 #cgo linux,arm64 LDFLAGS: -lpthread -lm -ldl
 
 // Windows x64: Link to combined static library in lib/windows-amd64
