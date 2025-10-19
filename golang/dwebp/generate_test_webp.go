@@ -9,8 +9,7 @@ import (
 )
 
 /*
-#cgo CFLAGS: -I../../c/include
-#cgo LDFLAGS: -L../../c/build -L../../c/build/libwebp -L../../c/build/libavif -L/opt/homebrew/lib -lnextimage -limageenc -limagedec -limageioutil -lwebp -lwebpdemux -lwebpmux -lsharpyuv -lgif -ljpeg -lpng -lz -lm
+#cgo CFLAGS: -I${SRCDIR}/../../include
 #include <stdlib.h>
 #include <string.h>
 #include "nextimage.h"
