@@ -100,8 +100,12 @@ set(SOURCES
     src/common.c
     src/webp.c
     src/avif.c
-    ../deps/libwebp/examples/gifdec.c
 )
+
+# giflibが見つかった場合のみgifdec.cを追加
+if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
+    list(APPEND SOURCES ../deps/libwebp/examples/gifdec.c)
+endif()
 
 # 静的ライブラリのビルド
 add_library(nextimage STATIC ${SOURCES})
@@ -111,8 +115,10 @@ target_include_directories(nextimage PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
 )
 
-# GIF support を有効化（gifdec.c で使用）
-target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
+# GIF support を有効化（giflibが見つかった場合のみ）
+if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
+    target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
+endif()
 
 # giflib のインクルードパスを nextimage ターゲットにも明示的に追加
 if(GIF_INCLUDE_DIR)
@@ -167,36 +173,50 @@ install(CODE "
     set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
     file(MAKE_DIRECTORY \"\${LIB_DIR}\")
 
+    # Collect required libraries
+    set(LIBS_TO_COMBINE
+        \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
+        \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
+    )
+
+    # Add optional libraries if they exist (imagedec/enc/ioutil may not exist without giflib)
+    if(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\")
+        list(APPEND LIBS_TO_COMBINE \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\")
+        message(STATUS \"Including libimagedec.a\")
+    else()
+        message(STATUS \"Skipping libimagedec.a (not built)\")
+    endif()
+    if(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\")
+        list(APPEND LIBS_TO_COMBINE \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\")
+        message(STATUS \"Including libimageenc.a\")
+    else()
+        message(STATUS \"Skipping libimageenc.a (not built)\")
+    endif()
+    if(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\")
+        list(APPEND LIBS_TO_COMBINE \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\")
+        message(STATUS \"Including libimageioutil.a\")
+    else()
+        message(STATUS \"Skipping libimageioutil.a (not built)\")
+    endif()
+
     # Use libtool to combine libraries on macOS/BSD, or ar MRI script on Linux/Windows
     if(APPLE)
         # macOS: use libtool
         execute_process(
-            COMMAND libtool -static -o \"\${LIB_DIR}/libnextimage.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
-                \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
+            COMMAND libtool -static -o \"\${LIB_DIR}/libnextimage.a\" \${LIBS_TO_COMBINE}
         )
     else()
         # Linux/Windows (MSYS2): use ar MRI script
         set(MRI_SCRIPT \"\${CMAKE_CURRENT_BINARY_DIR}/combine.mri\")
         file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${LIB_DIR}/libnextimage.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libnextimage.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebp.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpdemux.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageenc.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimageioutil.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\\n\")
-        file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB ${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\\n\")
+        foreach(LIB \${LIBS_TO_COMBINE})
+            file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB \${LIB}\\n\")
+        endforeach()
         file(APPEND \"\${MRI_SCRIPT}\" \"SAVE\\nEND\\n\")
         execute_process(
             COMMAND ar -M
