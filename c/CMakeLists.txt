@@ -37,6 +37,24 @@ endif()
 message(STATUS "Platform: ${PLATFORM}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+# giflib のパスを探す（libwebp より前に設定）
+# NO_DEFAULT_PATH を使用して、明示的に指定したパスのみを検索（Mono framework などを除外）
+find_library(GIF_LIBRARY NAMES gif
+    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+    NO_DEFAULT_PATH)
+find_path(GIF_INCLUDE_DIR gif_lib.h
+    PATHS /opt/homebrew/include /usr/local/include /usr/include
+    NO_DEFAULT_PATH)
+
+if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
+    message(STATUS "Found giflib: ${GIF_LIBRARY}")
+    message(STATUS "GIF include dir: ${GIF_INCLUDE_DIR}")
+    # libwebp が giflib を使用する際に、正しいパスを参照するように設定
+    include_directories(BEFORE SYSTEM ${GIF_INCLUDE_DIR})
+else()
+    message(WARNING "giflib not found - WebP to GIF conversion will not be available")
+endif()
+
 # libwebp のビルド
 # imagedec/imageenc ライブラリを使用するため ANIM_UTILS を ON にする
 # WebPAnimEncoder を使用するため WEBP_BUILD_LIBWEBPMUX を ON にする
@@ -96,22 +114,9 @@ target_include_directories(nextimage PRIVATE
 # GIF support を有効化（gifdec.c で使用）
 target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
 
-# giflib のパスを探す
-# NO_DEFAULT_PATH を使用して、明示的に指定したパスのみを検索（Mono framework などを除外）
-find_library(GIF_LIBRARY NAMES gif
-    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-    NO_DEFAULT_PATH)
-find_path(GIF_INCLUDE_DIR gif_lib.h
-    PATHS /opt/homebrew/include /usr/local/include /usr/include
-    NO_DEFAULT_PATH)
-
-if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
-    message(STATUS "Found giflib: ${GIF_LIBRARY}")
-    message(STATUS "GIF include dir: ${GIF_INCLUDE_DIR}")
-    # BEFORE を使用して、このパスを最優先にする（Mono framework より優先）
+# giflib のインクルードパスを nextimage ターゲットにも明示的に追加
+if(GIF_INCLUDE_DIR)
     target_include_directories(nextimage BEFORE PRIVATE ${GIF_INCLUDE_DIR})
-else()
-    message(WARNING "giflib not found - WebP to GIF conversion will not be available")
 endif()
 
 # libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
