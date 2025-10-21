@@ -380,7 +380,44 @@ We use [Semantic Versioning](https://semver.org/):
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes
 
-Current version: **0.1.0**
+Current version: **0.3.0**
+
+### Release Process
+
+When a new version is tagged, there's a brief window (typically 10-20 minutes) during which:
+- The Go code is immediately available via `go get`
+- Pre-built binaries are still being compiled by CI
+
+During this window, the auto-download will:
+1. First try to download the exact version
+2. If unavailable, automatically fall back to the previous stable version
+3. Display a notice that binaries will be available soon
+
+Users can also:
+- Wait a few minutes for CI to complete
+- Manually specify a previous version: `go get github.com/ideamans/libnextimage/golang@v0.2.0`
+- Build from source using `bash scripts/build-c-library.sh`
+
+### For Maintainers: Release Checklist
+
+To avoid the version mismatch window:
+
+1. **Option A: Wait for CI** (Recommended)
+   ```bash
+   git tag v0.4.0
+   git push origin v0.4.0
+   # Wait for GitHub Actions to complete (~15 minutes)
+   # Then update version.go and push
+   ```
+
+2. **Option B: Pre-build locally**
+   ```bash
+   # Build all platforms locally first (advanced)
+   # Create draft release with binaries
+   # Then tag and publish
+   ```
+
+The library is designed to be backwards compatible, so using v0.2.0 binaries with v0.3.0 code is safe for patch and minor version updates.
 
 ## Support
 
