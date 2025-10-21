@@ -400,24 +400,59 @@ Users can also:
 
 ### For Maintainers: Release Checklist
 
-To avoid the version mismatch window:
+**Recommended Release Process** (eliminates version mismatch window):
 
-1. **Option A: Wait for CI** (Recommended)
-   ```bash
-   git tag v0.4.0
-   git push origin v0.4.0
-   # Wait for GitHub Actions to complete (~15 minutes)
-   # Then update version.go and push
-   ```
+```bash
+# 1. Update version in code
+vim golang/version.go  # Update LibraryVersion
 
-2. **Option B: Pre-build locally**
-   ```bash
-   # Build all platforms locally first (advanced)
-   # Create draft release with binaries
-   # Then tag and publish
-   ```
+# 2. Commit version bump
+git add golang/version.go
+git commit -m "Bump version to v0.4.0"
+git push
 
-The library is designed to be backwards compatible, so using v0.2.0 binaries with v0.3.0 code is safe for patch and minor version updates.
+# 3. Create repository tag (triggers CI build)
+git tag v0.4.0
+git push origin v0.4.0
+
+# 4. Wait for GitHub Actions to complete (~15 minutes)
+gh run watch --repo ideamans/libnextimage
+
+# 5. Verify all binaries are available in release
+gh release view v0.4.0
+
+# 6. Once confirmed, create Go module tag
+git tag golang/v0.4.0
+git push origin golang/v0.4.0
+
+# Done! Users can now: go get github.com/ideamans/libnextimage/golang@v0.4.0
+```
+
+**Or use the automated script:**
+```bash
+# After v0.4.0 tag and binaries are ready
+bash scripts/release-golang-module.sh v0.4.0
+```
+
+The script will:
+- Verify repository tag exists
+- Check all platform binaries are available
+- Create and push golang/v0.4.0 tag
+- Provide confirmation and rollback instructions
+
+**Why this order?**
+- Step 3 triggers binary builds for all platforms
+- Step 6 makes the Go module available only after binaries are ready
+- No user will ever experience "binaries not yet available" errors
+
+**Rollback if needed:**
+```bash
+# If build fails, delete tags and fix issues
+git tag -d v0.4.0 golang/v0.4.0
+git push origin :refs/tags/v0.4.0 :refs/tags/golang/v0.4.0
+```
+
+The library is designed to be backwards compatible, so using v0.3.0 binaries with v0.4.0 code is safe for patch and minor version updates.
 
 ## Support
 
