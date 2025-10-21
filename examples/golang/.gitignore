@@ -1,0 +1,28 @@
+# Build outputs
+*.webp
+*.avif
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Go build artifacts
+go.mod
+go.sum
+vendor/
+
+# Test outputs
+output/
+*.test
+*.out
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
