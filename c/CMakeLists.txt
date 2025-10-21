@@ -38,23 +38,34 @@ message(STATUS "Platform: ${PLATFORM}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # システムライブラリの検索（静的ライブラリを優先）
-# NO_DEFAULT_PATH を使用して、明示的に指定したパスのみを検索（Mono framework などを除外）
 
-# jpeg
-find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
-    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-    NO_DEFAULT_PATH)
-find_path(JPEG_INCLUDE_DIR jpeglib.h
-    PATHS /opt/homebrew/include /usr/local/include /usr/include
-    NO_DEFAULT_PATH)
+if(APPLE)
+    # macOS: Use NO_DEFAULT_PATH to avoid Mono framework conflicts
+    # jpeg
+    find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+        NO_DEFAULT_PATH)
+    find_path(JPEG_INCLUDE_DIR jpeglib.h
+        PATHS /opt/homebrew/include /usr/local/include /usr/include
+        NO_DEFAULT_PATH)
 
-# png
-find_library(PNG_LIBRARY NAMES libpng.a png
-    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-    NO_DEFAULT_PATH)
-find_path(PNG_INCLUDE_DIR png.h
-    PATHS /opt/homebrew/include /usr/local/include /usr/include
-    NO_DEFAULT_PATH)
+    # png
+    find_library(PNG_LIBRARY NAMES libpng.a png
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+        NO_DEFAULT_PATH)
+    find_path(PNG_INCLUDE_DIR png.h
+        PATHS /opt/homebrew/include /usr/local/include /usr/include
+        NO_DEFAULT_PATH)
+else()
+    # Linux/Windows: Use standard CMake find modules (includes multi-arch paths)
+    # jpeg
+    find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg)
+    find_path(JPEG_INCLUDE_DIR jpeglib.h)
+
+    # png
+    find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16)
+    find_path(PNG_INCLUDE_DIR png.h)
+endif()
 
 # zlib (macOS SDK or system library)
 if(APPLE)
@@ -71,40 +82,46 @@ if(APPLE)
         PATHS ${MACOS_SDK_PATH}/usr/include /usr/include
         NO_DEFAULT_PATH)
 else()
-    # Linux/Windows: search for static library
-    find_library(Z_LIBRARY NAMES libz.a z
-        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-        NO_DEFAULT_PATH)
-    find_path(Z_INCLUDE_DIR zlib.h
-        PATHS /opt/homebrew/include /usr/local/include /usr/include
-        NO_DEFAULT_PATH)
+    # Linux/Windows: Use standard CMake find modules
+    find_library(Z_LIBRARY NAMES libz.a z)
+    find_path(Z_INCLUDE_DIR zlib.h)
 endif()
 
 # giflib
-find_library(GIF_LIBRARY NAMES libgif.a gif
-    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-    NO_DEFAULT_PATH)
-find_path(GIF_INCLUDE_DIR gif_lib.h
-    PATHS /opt/homebrew/include /usr/local/include /usr/include
-    NO_DEFAULT_PATH)
+if(APPLE)
+    # macOS: explicit paths
+    find_library(GIF_LIBRARY NAMES libgif.a gif
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+        NO_DEFAULT_PATH)
+    find_path(GIF_INCLUDE_DIR gif_lib.h
+        PATHS /opt/homebrew/include /usr/local/include /usr/include
+        NO_DEFAULT_PATH)
+else()
+    # Linux/Windows: Use standard CMake find modules
+    find_library(GIF_LIBRARY NAMES libgif.a gif)
+    find_path(GIF_INCLUDE_DIR gif_lib.h)
+endif()
 
 # 検出結果を表示
 if(JPEG_LIBRARY AND JPEG_INCLUDE_DIR)
     message(STATUS "Found libjpeg: ${JPEG_LIBRARY}")
+    message(STATUS "  Include dir: ${JPEG_INCLUDE_DIR}")
 else()
-    message(FATAL_ERROR "libjpeg not found")
+    message(FATAL_ERROR "libjpeg not found. Searched in standard CMake paths. Please install libjpeg-dev (Debian/Ubuntu) or jpeg (macOS).")
 endif()
 
 if(PNG_LIBRARY AND PNG_INCLUDE_DIR)
     message(STATUS "Found libpng: ${PNG_LIBRARY}")
+    message(STATUS "  Include dir: ${PNG_INCLUDE_DIR}")
 else()
-    message(FATAL_ERROR "libpng not found")
+    message(FATAL_ERROR "libpng not found. Please install libpng-dev (Debian/Ubuntu) or libpng (macOS).")
 endif()
 
 if(Z_LIBRARY AND Z_INCLUDE_DIR)
     message(STATUS "Found zlib: ${Z_LIBRARY}")
+    message(STATUS "  Include dir: ${Z_INCLUDE_DIR}")
 else()
-    message(FATAL_ERROR "zlib not found")
+    message(FATAL_ERROR "zlib not found. Please install zlib1g-dev (Debian/Ubuntu) or use system zlib (macOS).")
 endif()
 
 if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
