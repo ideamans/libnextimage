@@ -21,7 +21,10 @@ jobs:
           - os: ubuntu-latest
             platform: linux-amd64
             arch: amd64
-    
+          - os: windows-latest
+            platform: windows-amd64
+            arch: amd64
+
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -42,7 +45,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev nasm
 
-      - name: Build C library
+      - name: Setup MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-libjpeg-turbo
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-giflib
+            mingw-w64-ucrt-x86_64-libwebp
+            mingw-w64-ucrt-x86_64-nasm
+
+      - name: Build C library (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          bash scripts/build-c-library.sh
+
+      - name: Build C library (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           bash scripts/build-c-library.sh
       
