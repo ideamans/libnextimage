@@ -291,20 +291,13 @@ install(CODE "
     list(APPEND LIBS_TO_COMBINE \"${JPEG_LIBRARY}\")
     list(APPEND LIBS_TO_COMBINE \"${PNG_LIBRARY}\")
 
-    # Find giflib again in install scope (CMake install script runs in different scope)
-    if(APPLE)
-        find_library(GIF_INSTALL_LIB NAMES libgif.a gif
-            PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
-            NO_DEFAULT_PATH)
+    # Add giflib if it was found during configuration
+    # Use the GIF_LIBRARY variable that was already found earlier
+    if(\"${GIF_LIBRARY}\" STREQUAL \"GIF_LIBRARY-NOTFOUND\" OR \"${GIF_LIBRARY}\" STREQUAL \"\")
+        message(WARNING \"giflib not found - WebP to GIF conversion will not be available\")
     else()
-        find_library(GIF_INSTALL_LIB NAMES libgif.a gif)
-    endif()
-
-    if(GIF_INSTALL_LIB)
-        list(APPEND LIBS_TO_COMBINE \"\${GIF_INSTALL_LIB}\")
-        message(STATUS \"Including giflib: \${GIF_INSTALL_LIB}\")
-    else()
-        message(WARNING \"giflib not found during install - WebP to GIF conversion will not be available\")
+        list(APPEND LIBS_TO_COMBINE \"${GIF_LIBRARY}\")
+        message(STATUS \"Including giflib: ${GIF_LIBRARY}\")
     endif()
 
     # Platform-specific combining strategy
