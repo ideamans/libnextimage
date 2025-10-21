@@ -24,7 +24,8 @@ Convert JPEG images to WebP format with customizable quality settings.
 ```bash
 cd examples/golang
 
-# The go.mod is already set up, just get dependencies
+# Get the latest version of the library
+go get github.com/ideamans/libnextimage/golang@latest
 go mod tidy
 
 # Download a sample image (or use your own)
