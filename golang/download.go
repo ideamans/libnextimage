@@ -37,24 +37,34 @@ func checkLibraryExists() bool {
 	}
 	packageDir := filepath.Dir(filename)
 	projectRoot := filepath.Dir(packageDir)
-	
+
 	libPath := filepath.Join(projectRoot, getLibraryPath())
 	_, err := os.Stat(libPath)
 	return err == nil
 }
 
+// CheckLibraryExists is a public wrapper for checking if the library exists
+func CheckLibraryExists() bool {
+	return checkLibraryExists()
+}
+
 // downloadLibrary downloads the pre-built library from GitHub Releases
 func downloadLibrary() error {
+	return downloadLibraryVersion(LibraryVersion)
+}
+
+// downloadLibraryVersion downloads a specific version of the pre-built library
+func downloadLibraryVersion(version string) error {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		return fmt.Errorf("failed to get caller information")
 	}
 	packageDir := filepath.Dir(filename)
 	projectRoot := filepath.Dir(packageDir)
-	
+
 	platform := getPlatform()
-	archiveName := fmt.Sprintf("libnextimage-v%s-%s.tar.gz", LibraryVersion, platform)
-	url := fmt.Sprintf("%s/v%s/%s", baseURL, LibraryVersion, archiveName)
+	archiveName := fmt.Sprintf("libnextimage-v%s-%s.tar.gz", version, platform)
+	url := fmt.Sprintf("%s/v%s/%s", baseURL, version, archiveName)
 	
 	fmt.Printf("Downloading libnextimage library for %s...\n", platform)
 	fmt.Printf("URL: %s\n", url)
@@ -116,6 +126,14 @@ func downloadLibrary() error {
 	
 	fmt.Printf("Successfully downloaded and extracted library to %s\n", projectRoot)
 	return nil
+}
+
+// DownloadLibrary is a public wrapper for downloading the library with the default version
+func DownloadLibrary(version string) error {
+	if version == "" {
+		return downloadLibrary()
+	}
+	return downloadLibraryVersion(version)
 }
 
 // init is called automatically when the package is imported
