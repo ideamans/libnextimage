@@ -6,4 +6,4 @@ go 1.24.7
 // Uncomment the replace directive below to use your local version
 // replace github.com/ideamans/libnextimage/golang => ../../golang
 
-require github.com/ideamans/libnextimage/golang v0.0.0-20251021125411-e0b64af8a88a // indirect
+require github.com/ideamans/libnextimage/golang v0.3.0
