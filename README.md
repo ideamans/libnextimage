@@ -17,26 +17,30 @@ This library provides a unified, command-line compatible interface to libwebp an
 
 ### For Go Users
 
-#### Option 1: Automatic Download (Recommended)
-
-When you use `go get`, the library will automatically download pre-built binaries from GitHub Releases:
+#### Quick Start
 
 ```bash
+# Step 1: Get the module
 go get github.com/ideamans/libnextimage/golang
+
+# Step 2: Install pre-built libraries to your Go module cache (ONE-TIME per version)
+bash <(curl -fsSL https://raw.githubusercontent.com/ideamans/libnextimage/main/scripts/setup-go-module.sh)
+
+# On Windows (Git Bash/MSYS2), you may need administrator privileges
 ```
 
-The library will automatically:
-1. Detect your platform (darwin-arm64, linux-amd64, etc.)
-2. Download the appropriate `libnextimage.a` from GitHub Releases
-3. Extract it to the correct location
+The setup script will:
+1. Detect your platform (darwin-arm64, linux-amd64, windows-amd64, etc.)
+2. Download the appropriate pre-built `libnextimage.a` from GitHub Releases
+3. Install it to your Go module cache (may require sudo/administrator permissions)
 
-If auto-download fails or you want to manually install:
+**Alternative manual installation**:
 
 ```bash
-# Using install tool
+# Using standalone install tool to install to current directory
 go run github.com/ideamans/libnextimage/golang/cmd/install@latest
 
-# Or using shell script
+# Or using install script to project directory
 git clone https://github.com/ideamans/libnextimage.git
 cd libnextimage
 bash scripts/install.sh
@@ -259,13 +263,36 @@ The script will generate:
 
 ## Installation Tools
 
-### Go Installation Tool
+### Go Module Setup Script (Recommended for Go users)
 
-The repository includes a Go-based installation tool for easy library management:
+Install pre-built libraries directly to your Go module cache:
 
 ```bash
-# Install with default version
+# Install for current module version
+bash <(curl -fsSL https://raw.githubusercontent.com/ideamans/libnextimage/main/scripts/setup-go-module.sh)
+
+# Install specific version
+bash <(curl -fsSL https://raw.githubusercontent.com/ideamans/libnextimage/main/scripts/setup-go-module.sh) v0.3.0
+```
+
+This script will:
+- Auto-detect your platform (darwin-arm64, linux-amd64, windows-amd64, etc.)
+- Find your Go module cache location
+- Download and extract the pre-built library to the correct module directory
+- Handle read-only module cache (may require sudo/administrator permissions)
+
+**Note**: On Windows, run in Git Bash or MSYS2 with administrator privileges.
+
+### Go Installation Tool
+
+Standalone tool for installing to custom directories:
+
+```bash
+# Install to current directory
 go run github.com/ideamans/libnextimage/golang/cmd/install@latest
+
+# Install to specific directory
+go run github.com/ideamans/libnextimage/golang/cmd/install@latest -dir /path/to/project
 
 # Force re-download even if library exists
 go run github.com/ideamans/libnextimage/golang/cmd/install@latest -force
@@ -274,17 +301,12 @@ go run github.com/ideamans/libnextimage/golang/cmd/install@latest -force
 go run github.com/ideamans/libnextimage/golang/cmd/install@latest -list
 ```
 
-The tool will:
-- Automatically detect your platform
-- Download the appropriate pre-built library
-- Extract it to the correct location in your Go module cache
-
 ### Shell Installation Script
 
 For C/C++ projects or manual installation:
 
 ```bash
-# Install latest version
+# Install latest version to current directory
 bash scripts/install.sh
 
 # Install specific version
