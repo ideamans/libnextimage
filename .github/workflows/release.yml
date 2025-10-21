@@ -72,12 +72,35 @@ jobs:
         run: |
           bash scripts/build-c-library.sh
       
-      - name: Verify build
+      - name: Verify build (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          ls -lh lib/${{ matrix.platform }}/libnextimage.a
+          ls -lh include/
+
+      - name: Verify build (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           ls -lh lib/${{ matrix.platform }}/libnextimage.a
           ls -lh include/
       
-      - name: Package release
+      - name: Package release (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p release-${{ matrix.platform }}/lib
+          mkdir -p release-${{ matrix.platform }}/include/nextimage
+          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/
+          cp include/*.h release-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
+          cd release-${{ matrix.platform }}
+          tar czf ../libnextimage-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
+          cd ..
+          ls -lh libnextimage-*.tar.gz
+
+      - name: Package release (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           mkdir -p release-${{ matrix.platform }}/lib
           mkdir -p release-${{ matrix.platform }}/include/nextimage
