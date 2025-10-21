@@ -7,7 +7,7 @@
 *.gif
 
 # Go build artifacts
-go.mod
+# go.mod is tracked to show users the required version
 go.sum
 vendor/
 
