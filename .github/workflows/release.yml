@@ -76,6 +76,15 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           ls -lh lib/${{ matrix.platform }}/libnextimage.a
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            ls -lh lib/${{ matrix.platform }}/libnextimage.dylib
+            # 動的ライブラリの依存関係を確認（自己完結しているか）
+            otool -L lib/${{ matrix.platform }}/libnextimage.dylib
+          else
+            ls -lh lib/${{ matrix.platform }}/libnextimage.so
+            # 動的ライブラリの依存関係を確認（自己完結しているか）
+            ldd lib/${{ matrix.platform }}/libnextimage.so || true
+          fi
           ls -lh include/
 
       - name: Verify build (Windows - MSYS2)
@@ -83,33 +92,64 @@ jobs:
         shell: msys2 {0}
         run: |
           ls -lh lib/${{ matrix.platform }}/libnextimage.a
+          ls -lh lib/${{ matrix.platform }}/libnextimage.dll
+          # 動的ライブラリの依存関係を確認（自己完結しているか）
+          ldd lib/${{ matrix.platform }}/libnextimage.dll || true
           ls -lh include/
       
       - name: Package release (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p release-${{ matrix.platform }}/lib/${{ matrix.platform }}
-          mkdir -p release-${{ matrix.platform }}/include/nextimage
-          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/${{ matrix.platform }}/
-          cp include/*.h release-${{ matrix.platform }}/include/
-          cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
-          cd release-${{ matrix.platform }}
+          # Static library package
+          mkdir -p release-static-${{ matrix.platform }}/lib/${{ matrix.platform }}
+          mkdir -p release-static-${{ matrix.platform }}/include/nextimage
+          cp lib/${{ matrix.platform }}/libnextimage.a release-static-${{ matrix.platform }}/lib/${{ matrix.platform }}/
+          cp include/*.h release-static-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-static-${{ matrix.platform }}/include/nextimage/
+          cd release-static-${{ matrix.platform }}
           tar czf ../libnextimage-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
           cd ..
+
+          # Shared library package
+          mkdir -p release-shared-${{ matrix.platform }}/lib/${{ matrix.platform }}
+          mkdir -p release-shared-${{ matrix.platform }}/include/nextimage
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            cp lib/${{ matrix.platform }}/libnextimage.dylib release-shared-${{ matrix.platform }}/lib/${{ matrix.platform }}/
+          else
+            cp lib/${{ matrix.platform }}/libnextimage.so release-shared-${{ matrix.platform }}/lib/${{ matrix.platform }}/
+          fi
+          cp include/*.h release-shared-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-shared-${{ matrix.platform }}/include/nextimage/
+          cd release-shared-${{ matrix.platform }}
+          tar czf ../libnextimage-shared-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
+          cd ..
+
           ls -lh libnextimage-*.tar.gz
 
       - name: Package release (Windows - MSYS2)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          mkdir -p release-${{ matrix.platform }}/lib/${{ matrix.platform }}
-          mkdir -p release-${{ matrix.platform }}/include/nextimage
-          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/${{ matrix.platform }}/
-          cp include/*.h release-${{ matrix.platform }}/include/
-          cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
-          cd release-${{ matrix.platform }}
+          # Static library package
+          mkdir -p release-static-${{ matrix.platform }}/lib/${{ matrix.platform }}
+          mkdir -p release-static-${{ matrix.platform }}/include/nextimage
+          cp lib/${{ matrix.platform }}/libnextimage.a release-static-${{ matrix.platform }}/lib/${{ matrix.platform }}/
+          cp include/*.h release-static-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-static-${{ matrix.platform }}/include/nextimage/
+          cd release-static-${{ matrix.platform }}
           tar czf ../libnextimage-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
           cd ..
+
+          # Shared library package
+          mkdir -p release-shared-${{ matrix.platform }}/lib/${{ matrix.platform }}
+          mkdir -p release-shared-${{ matrix.platform }}/include/nextimage
+          cp lib/${{ matrix.platform }}/libnextimage.dll release-shared-${{ matrix.platform }}/lib/${{ matrix.platform }}/
+          cp include/*.h release-shared-${{ matrix.platform }}/include/
+          cp include/nextimage/*.h release-shared-${{ matrix.platform }}/include/nextimage/
+          cd release-shared-${{ matrix.platform }}
+          tar czf ../libnextimage-shared-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz .
+          cd ..
+
           ls -lh libnextimage-*.tar.gz
       
       - name: Upload artifact

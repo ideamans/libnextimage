@@ -12,6 +12,7 @@ This library provides a unified, command-line compatible interface to libwebp an
 - **Binary Compatibility**: Produces identical output to official CLI tools
 - **Zero Dependencies**: Single static library with all dependencies included
 - **Cross-Platform**: macOS (Intel/ARM), Linux (x64/ARM64), Windows
+- **Dual Distribution**: Both static (.a) and shared (.so/.dylib/.dll) libraries available
 
 ## Installation
 
@@ -87,14 +88,39 @@ The script will download and install:
 - `lib/<platform>/libnextimage.a` - Combined static library
 - `include/*.h` - Header files
 
+#### Shared Library (for Node.js/FFI)
+
+For Node.js bindings or other FFI use cases, download the shared library version:
+
+```bash
+# Download shared library package
+# Example for darwin-arm64:
+curl -L https://github.com/ideamans/libnextimage/releases/download/v0.4.0/libnextimage-shared-v0.4.0-darwin-arm64.tar.gz | tar xz
+```
+
+This provides:
+- `lib/<platform>/libnextimage.dylib` (macOS)
+- `lib/<platform>/libnextimage.so` (Linux)
+- `lib/<platform>/libnextimage.dll` (Windows)
+- `include/*.h` - Header files
+
 #### Manual Installation
 
 1. Download the pre-built library for your platform from [Releases](https://github.com/ideamans/libnextimage/releases):
+
+   **Static libraries** (for C/C++ and Go):
    - `libnextimage-v0.1.0-darwin-arm64.tar.gz` (macOS Apple Silicon)
    - `libnextimage-v0.1.0-darwin-amd64.tar.gz` (macOS Intel)
    - `libnextimage-v0.1.0-linux-amd64.tar.gz` (Linux x64)
    - `libnextimage-v0.1.0-linux-arm64.tar.gz` (Linux ARM64)
    - `libnextimage-v0.1.0-windows-amd64.tar.gz` (Windows x64)
+
+   **Shared libraries** (for Node.js/FFI):
+   - `libnextimage-shared-v0.1.0-darwin-arm64.tar.gz` (macOS Apple Silicon)
+   - `libnextimage-shared-v0.1.0-darwin-amd64.tar.gz` (macOS Intel)
+   - `libnextimage-shared-v0.1.0-linux-amd64.tar.gz` (Linux x64)
+   - `libnextimage-shared-v0.1.0-linux-arm64.tar.gz` (Linux ARM64)
+   - `libnextimage-shared-v0.1.0-windows-amd64.tar.gz` (Windows x64)
 
 2. Extract the archive:
    ```bash
