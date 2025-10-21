@@ -61,11 +61,82 @@ jobs:
         run: |
           bash scripts/build-c-library.sh
 
+      - name: Dump build logs (on failure - Unix)
+        if: failure() && runner.os != 'Windows'
+        run: |
+          echo "=== CMake Configuration Log ==="
+          if [ -f "c/build/CMakeFiles/CMakeOutput.log" ]; then
+            cat c/build/CMakeFiles/CMakeOutput.log
+          else
+            echo "CMakeOutput.log not found"
+          fi
+          echo ""
+          echo "=== CMake Error Log ==="
+          if [ -f "c/build/CMakeFiles/CMakeError.log" ]; then
+            cat c/build/CMakeFiles/CMakeError.log
+          else
+            echo "CMakeError.log not found"
+          fi
+          echo ""
+          echo "=== Build Directory Contents ==="
+          ls -la c/build/ || echo "Build directory not found"
+          echo ""
+          echo "=== Library Installation Directory ==="
+          ls -la lib/*/ || echo "Library directory not found"
+          echo ""
+          echo "=== Check if giflib was found ==="
+          grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
+          echo ""
+          echo "=== libnextimage.a contents ==="
+          if [ -f "lib/linux-amd64/libnextimage.a" ]; then
+            ar -t lib/linux-amd64/libnextimage.a | head -50
+          elif [ -f "lib/darwin-arm64/libnextimage.a" ]; then
+            ar -t lib/darwin-arm64/libnextimage.a | head -50
+          elif [ -f "lib/darwin-amd64/libnextimage.a" ]; then
+            ar -t lib/darwin-amd64/libnextimage.a | head -50
+          else
+            echo "libnextimage.a not found"
+          fi
+
       - name: Build C library (Windows - MSYS2)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
           bash scripts/build-c-library.sh
+
+      - name: Dump build logs (on failure - Windows)
+        if: failure() && runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          echo "=== CMake Configuration Log ==="
+          if [ -f "c/build/CMakeFiles/CMakeOutput.log" ]; then
+            cat c/build/CMakeFiles/CMakeOutput.log
+          else
+            echo "CMakeOutput.log not found"
+          fi
+          echo ""
+          echo "=== CMake Error Log ==="
+          if [ -f "c/build/CMakeFiles/CMakeError.log" ]; then
+            cat c/build/CMakeFiles/CMakeError.log
+          else
+            echo "CMakeError.log not found"
+          fi
+          echo ""
+          echo "=== Build Directory Contents ==="
+          ls -la c/build/ || echo "Build directory not found"
+          echo ""
+          echo "=== Library Installation Directory ==="
+          ls -la lib/*/ || echo "Library directory not found"
+          echo ""
+          echo "=== Check if giflib was found ==="
+          grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
+          echo ""
+          echo "=== libnextimage.a contents ==="
+          if [ -f "lib/windows-amd64/libnextimage.a" ]; then
+            ar -t lib/windows-amd64/libnextimage.a | head -50
+          else
+            echo "libnextimage.a not found"
+          fi
 
       - name: Generate test images (Unix/MSYS2)
         if: runner.os != 'Windows'
