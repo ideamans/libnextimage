@@ -4,16 +4,17 @@ package dwebp
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../include
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-arm64 -lnextimage
-#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a /opt/homebrew/lib/libgif.a -lz
-#cgo darwin,arm64 LDFLAGS: -lc++ -framework CoreFoundation
-#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-amd64 -lnextimage
-#cgo darwin,amd64 LDFLAGS: /usr/local/lib/libjpeg.a /usr/local/lib/libpng.a /usr/local/lib/libgif.a -lz
-#cgo darwin,amd64 LDFLAGS: -lc++ -framework CoreFoundation
-#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../lib/linux-amd64 -lnextimage
-#cgo linux,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
-#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../lib/linux-arm64 -lnextimage
-#cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lgif -lz -lpthread -lm -ldl
+
+// libnextimage.a is a fully self-contained static library
+// Only minimal system libraries are needed: zlib, C++, pthread, math
+
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-arm64 -lnextimage -lz -lc++ -lpthread -lm
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-amd64 -lnextimage -lz -lc++ -lpthread -lm
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../lib/linux-arm64 -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../lib/linux-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../../lib/windows-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../../lib/other -lnextimage -lz -lstdc++ -lpthread -lm
+
 #include <stdlib.h>
 #include <string.h>
 #include "nextimage.h"

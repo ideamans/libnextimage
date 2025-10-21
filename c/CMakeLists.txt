@@ -37,14 +37,75 @@ endif()
 message(STATUS "Platform: ${PLATFORM}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# giflib のパスを探す（libwebp より前に設定）
+# システムライブラリの検索（静的ライブラリを優先）
 # NO_DEFAULT_PATH を使用して、明示的に指定したパスのみを検索（Mono framework などを除外）
-find_library(GIF_LIBRARY NAMES gif
+
+# jpeg
+find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
+    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+    NO_DEFAULT_PATH)
+find_path(JPEG_INCLUDE_DIR jpeglib.h
+    PATHS /opt/homebrew/include /usr/local/include /usr/include
+    NO_DEFAULT_PATH)
+
+# png
+find_library(PNG_LIBRARY NAMES libpng.a png
+    PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+    NO_DEFAULT_PATH)
+find_path(PNG_INCLUDE_DIR png.h
+    PATHS /opt/homebrew/include /usr/local/include /usr/include
+    NO_DEFAULT_PATH)
+
+# zlib (macOS SDK or system library)
+if(APPLE)
+    # macOS: zlib is in the SDK
+    execute_process(
+        COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE MACOS_SDK_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    find_library(Z_LIBRARY NAMES z
+        PATHS ${MACOS_SDK_PATH}/usr/lib /usr/lib
+        NO_DEFAULT_PATH)
+    find_path(Z_INCLUDE_DIR zlib.h
+        PATHS ${MACOS_SDK_PATH}/usr/include /usr/include
+        NO_DEFAULT_PATH)
+else()
+    # Linux/Windows: search for static library
+    find_library(Z_LIBRARY NAMES libz.a z
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+        NO_DEFAULT_PATH)
+    find_path(Z_INCLUDE_DIR zlib.h
+        PATHS /opt/homebrew/include /usr/local/include /usr/include
+        NO_DEFAULT_PATH)
+endif()
+
+# giflib
+find_library(GIF_LIBRARY NAMES libgif.a gif
     PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
     NO_DEFAULT_PATH)
 find_path(GIF_INCLUDE_DIR gif_lib.h
     PATHS /opt/homebrew/include /usr/local/include /usr/include
     NO_DEFAULT_PATH)
+
+# 検出結果を表示
+if(JPEG_LIBRARY AND JPEG_INCLUDE_DIR)
+    message(STATUS "Found libjpeg: ${JPEG_LIBRARY}")
+else()
+    message(FATAL_ERROR "libjpeg not found")
+endif()
+
+if(PNG_LIBRARY AND PNG_INCLUDE_DIR)
+    message(STATUS "Found libpng: ${PNG_LIBRARY}")
+else()
+    message(FATAL_ERROR "libpng not found")
+endif()
+
+if(Z_LIBRARY AND Z_INCLUDE_DIR)
+    message(STATUS "Found zlib: ${Z_LIBRARY}")
+else()
+    message(FATAL_ERROR "zlib not found")
+endif()
 
 if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
     message(STATUS "Found giflib: ${GIF_LIBRARY}")
@@ -129,6 +190,9 @@ endif()
 # webp, webpdemux, webpmux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる
 target_link_libraries(nextimage PUBLIC webp webpdemux libwebpmux sharpyuv imagedec imageenc avif)
 
+# システムライブラリを静的リンク（libnextimage.aに含める）
+target_link_libraries(nextimage PUBLIC ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+
 # giflib をリンク（見つかった場合）
 if(GIF_LIBRARY)
     target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
@@ -204,14 +268,31 @@ install(CODE "
         message(STATUS \"Skipping libimageioutil.a (not built)\")
     endif()
 
-    # Use libtool to combine libraries on macOS/BSD, or ar MRI script on Linux/Windows
+    # Add system libraries (jpeg, png, gif)
+    # Note: zlib is excluded because on macOS it's a .tbd file (dynamic library stub)
+    # and cannot be statically linked. It must be linked with -lz at Go build time.
+    list(APPEND LIBS_TO_COMBINE \"${JPEG_LIBRARY}\")
+    list(APPEND LIBS_TO_COMBINE \"${PNG_LIBRARY}\")
+
+    # Find giflib again in install scope (CMake install script runs in different scope)
+    find_library(GIF_INSTALL_LIB NAMES libgif.a gif
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib
+        NO_DEFAULT_PATH)
+    if(GIF_INSTALL_LIB)
+        list(APPEND LIBS_TO_COMBINE \"\${GIF_INSTALL_LIB}\")
+        message(STATUS \"Including giflib: \${GIF_INSTALL_LIB}\")
+    else()
+        message(WARNING \"giflib not found during install\")
+    endif()
+
+    # Platform-specific combining strategy
     if(APPLE)
-        # macOS: use libtool
+        # macOS: use libtool -static (properly handles nested archives)
         execute_process(
             COMMAND libtool -static -o \"\${LIB_DIR}/libnextimage.a\" \${LIBS_TO_COMBINE}
         )
     else()
-        # Linux/Windows (MSYS2): use ar MRI script
+        # Linux/Windows: use ar MRI script
         set(MRI_SCRIPT \"\${CMAKE_CURRENT_BINARY_DIR}/combine.mri\")
         file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${LIB_DIR}/libnextimage.a\\n\")
         foreach(LIB \${LIBS_TO_COMBINE})
@@ -226,9 +307,6 @@ install(CODE "
             COMMAND ranlib \"\${LIB_DIR}/libnextimage.a\"
         )
     endif()
-
-    # Cleanup
-    file(REMOVE_RECURSE \"\${TEMP_DIR}\")
 
     message(STATUS \"Combined library installed to: \${LIB_DIR}/libnextimage.a\")
 ")

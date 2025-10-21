@@ -211,6 +211,28 @@ The script will generate:
 - `lib/<platform>/libnextimage.a` - Combined static library
 - `include/*.h` - Header files
 
+## Makefile Targets
+
+For convenient building and testing, use the provided Makefile:
+
+```bash
+# Show all available targets
+make help
+
+# C Library
+make build-c      # Build C library (libnextimage.a)
+make test-c       # Run C tests
+make install-c    # Build and install to lib/ directory
+make clean-c      # Clean C build artifacts
+
+# Go Package
+make test-go      # Run Go tests
+
+# Combined
+make test-all     # Run both C and Go tests
+make clean-all    # Clean all build artifacts
+```
+
 ## Testing
 
 ### Test Images

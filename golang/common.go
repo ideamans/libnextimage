@@ -3,38 +3,29 @@ package libnextimage
 /*
 #cgo CFLAGS: -I${SRCDIR}/../include
 
-// macOS ARM64: Link to combined static library in lib/darwin-arm64
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage
-#cgo darwin,arm64 LDFLAGS: /opt/homebrew/lib/libjpeg.a /opt/homebrew/lib/libpng.a /opt/homebrew/lib/libgif.a -lz
-#cgo darwin,arm64 LDFLAGS: -lc++ -framework CoreFoundation
+// libnextimage.a is a fully self-contained static library that includes:
+// - webp, avif, aom (image codecs)
+// - jpeg, png, gif (system image libraries)
+//
+// Only minimal system libraries are needed:
+// - zlib: compression (required by PNG)
+// - C++ standard library: libavif and libaom are written in C++
+// - pthread: multi-threading support
+// - math library: mathematical functions
 
-// macOS Intel: Link to combined static library in lib/darwin-amd64
-#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage
-#cgo darwin,amd64 LDFLAGS: /usr/local/lib/libjpeg.a /usr/local/lib/libpng.a /usr/local/lib/libgif.a -lz
-#cgo darwin,amd64 LDFLAGS: -lc++ -framework CoreFoundation
+// macOS
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage -lz -lc++ -lpthread -lm
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage -lz -lc++ -lpthread -lm
 
-// Linux x64: Link to combined static library in lib/linux-amd64
-#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage
-#cgo linux,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz
-#cgo linux,amd64 LDFLAGS: -lpthread -lm -ldl
+// Linux
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
 
-// Linux ARM64: Link to combined static library in lib/linux-arm64
-#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage
-#cgo linux,arm64 LDFLAGS: -ljpeg -lpng -lgif -lz
-#cgo linux,arm64 LDFLAGS: -lpthread -lm -ldl
+// Windows (MSYS2/MinGW)
+#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
 
-// Windows x64 (MSYS2): Link to combined static library in lib/windows-amd64
-// Note: When building with MSYS2, set CGO_LDFLAGS to include MSYS2 library paths
-// libnextimage.a includes webp, avif, aom libraries but depends on system jpeg, png, gif
-#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage
-#cgo windows,amd64 LDFLAGS: -ljpeg -lpng -lgif -lz
-#cgo windows,amd64 LDFLAGS: -lstdc++ -lpthread -lm
-#cgo windows,amd64 LDFLAGS: -lws2_32 -lkernel32 -luser32
-
-// Other platforms: Link to combined static library in lib/other
-#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other -lnextimage
-#cgo !darwin,!linux,!windows LDFLAGS: -ljpeg -lpng -lz
-#cgo !darwin,!linux,!windows LDFLAGS: -lpthread -lm
+// Other platforms
+#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other -lnextimage -lz -lstdc++ -lpthread -lm
 
 #include "nextimage.h"
 #include "webp.h"
