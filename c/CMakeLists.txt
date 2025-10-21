@@ -58,12 +58,28 @@ if(APPLE)
         NO_DEFAULT_PATH)
 else()
     # Linux/Windows: Use standard CMake find modules (includes multi-arch paths)
+    # Add architecture-specific library paths for Linux
+    if(UNIX AND NOT APPLE)
+        # Get the architecture-specific library directory
+        execute_process(
+            COMMAND gcc -print-multiarch
+            OUTPUT_VARIABLE GCC_MULTIARCH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(GCC_MULTIARCH)
+            set(MULTIARCH_LIB_PATH "/usr/lib/${GCC_MULTIARCH}")
+        endif()
+    endif()
+
     # jpeg
-    find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg)
+    find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
+        PATHS ${MULTIARCH_LIB_PATH})
     find_path(JPEG_INCLUDE_DIR jpeglib.h)
 
     # png
-    find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16)
+    find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16
+        PATHS ${MULTIARCH_LIB_PATH})
     find_path(PNG_INCLUDE_DIR png.h)
 endif()
 
@@ -83,7 +99,8 @@ if(APPLE)
         NO_DEFAULT_PATH)
 else()
     # Linux/Windows: Use standard CMake find modules
-    find_library(Z_LIBRARY NAMES libz.a z)
+    find_library(Z_LIBRARY NAMES libz.a z
+        PATHS ${MULTIARCH_LIB_PATH})
     find_path(Z_INCLUDE_DIR zlib.h)
 endif()
 
@@ -98,7 +115,8 @@ if(APPLE)
         NO_DEFAULT_PATH)
 else()
     # Linux/Windows: Use standard CMake find modules
-    find_library(GIF_LIBRARY NAMES libgif.a gif)
+    find_library(GIF_LIBRARY NAMES libgif.a gif
+        PATHS ${MULTIARCH_LIB_PATH})
     find_path(GIF_INCLUDE_DIR gif_lib.h)
 endif()
 
