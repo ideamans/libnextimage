@@ -88,9 +88,9 @@ jobs:
       - name: Package release (Unix)
         if: runner.os != 'Windows'
         run: |
-          mkdir -p release-${{ matrix.platform }}/lib
+          mkdir -p release-${{ matrix.platform }}/lib/${{ matrix.platform }}
           mkdir -p release-${{ matrix.platform }}/include/nextimage
-          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/
+          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/${{ matrix.platform }}/
           cp include/*.h release-${{ matrix.platform }}/include/
           cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
           cd release-${{ matrix.platform }}
@@ -102,9 +102,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          mkdir -p release-${{ matrix.platform }}/lib
+          mkdir -p release-${{ matrix.platform }}/lib/${{ matrix.platform }}
           mkdir -p release-${{ matrix.platform }}/include/nextimage
-          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/
+          cp lib/${{ matrix.platform }}/libnextimage.a release-${{ matrix.platform }}/lib/${{ matrix.platform }}/
           cp include/*.h release-${{ matrix.platform }}/include/
           cp include/nextimage/*.h release-${{ matrix.platform }}/include/nextimage/
           cd release-${{ matrix.platform }}

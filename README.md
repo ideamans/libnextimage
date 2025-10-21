@@ -30,9 +30,24 @@ The library will automatically:
 2. Download the appropriate `libnextimage.a` from GitHub Releases
 3. Extract it to the correct location
 
+If auto-download fails or you want to manually install:
+
+```bash
+# Using install tool
+go run github.com/ideamans/libnextimage/golang/cmd/install@latest
+
+# Or using shell script
+git clone https://github.com/ideamans/libnextimage.git
+cd libnextimage
+bash scripts/install.sh
+
+# Install specific version
+bash scripts/install.sh v0.1.0
+```
+
 #### Option 2: Build from Source
 
-If you prefer to build from source or the auto-download fails:
+If you prefer to build from source:
 
 ```bash
 git clone --recursive https://github.com/ideamans/libnextimage.git
@@ -48,24 +63,55 @@ import "github.com/ideamans/libnextimage/golang"
 
 ### For C/C++ Users
 
+#### Quick Install
+
+Use the install script to automatically download and extract the library:
+
+```bash
+# Clone the repository (no --recursive needed for pre-built binaries)
+git clone https://github.com/ideamans/libnextimage.git
+cd libnextimage
+
+# Run install script (automatically detects your platform)
+bash scripts/install.sh
+
+# Or install specific version
+bash scripts/install.sh v0.1.0
+```
+
+The script will download and install:
+- `lib/<platform>/libnextimage.a` - Combined static library
+- `include/*.h` - Header files
+
+#### Manual Installation
+
 1. Download the pre-built library for your platform from [Releases](https://github.com/ideamans/libnextimage/releases):
    - `libnextimage-v0.1.0-darwin-arm64.tar.gz` (macOS Apple Silicon)
    - `libnextimage-v0.1.0-darwin-amd64.tar.gz` (macOS Intel)
    - `libnextimage-v0.1.0-linux-amd64.tar.gz` (Linux x64)
    - `libnextimage-v0.1.0-linux-arm64.tar.gz` (Linux ARM64)
+   - `libnextimage-v0.1.0-windows-amd64.tar.gz` (Windows x64)
 
 2. Extract the archive:
    ```bash
    tar xzf libnextimage-v0.1.0-<platform>.tar.gz
    ```
 
-3. Copy files to your project:
+3. The archive contains:
+   ```
+   lib/<platform>/libnextimage.a  # Platform-specific library
+   include/*.h                     # Header files
+   include/nextimage/*.h           # Command-line API headers
+   ```
+
+4. Copy files to your project:
    ```bash
-   cp lib/libnextimage.a /path/to/your/project/
+   # Example for darwin-arm64
+   cp lib/darwin-arm64/libnextimage.a /path/to/your/project/
    cp -r include/* /path/to/your/project/include/
    ```
 
-4. Link in your build:
+5. Link in your build:
    ```bash
    gcc your_code.c -I./include -L. -lnextimage -ljpeg -lpng -lgif -lz -lc++ -o your_program
    ```
@@ -210,6 +256,46 @@ bash scripts/build-c-library.sh
 The script will generate:
 - `lib/<platform>/libnextimage.a` - Combined static library
 - `include/*.h` - Header files
+
+## Installation Tools
+
+### Go Installation Tool
+
+The repository includes a Go-based installation tool for easy library management:
+
+```bash
+# Install with default version
+go run github.com/ideamans/libnextimage/golang/cmd/install@latest
+
+# Force re-download even if library exists
+go run github.com/ideamans/libnextimage/golang/cmd/install@latest -force
+
+# List available platforms
+go run github.com/ideamans/libnextimage/golang/cmd/install@latest -list
+```
+
+The tool will:
+- Automatically detect your platform
+- Download the appropriate pre-built library
+- Extract it to the correct location in your Go module cache
+
+### Shell Installation Script
+
+For C/C++ projects or manual installation:
+
+```bash
+# Install latest version
+bash scripts/install.sh
+
+# Install specific version
+bash scripts/install.sh v0.2.0
+```
+
+The script features:
+- Platform auto-detection (darwin-arm64, linux-amd64, etc.)
+- Interactive confirmation before overwriting existing files
+- Detailed progress and error reporting
+- Works with curl or wget
 
 ## Makefile Targets
 
