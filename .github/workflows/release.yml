@@ -16,15 +16,11 @@ jobs:
             platform: darwin-arm64
             arch: arm64
           - os: macos-13
-            platform: darwin-amd64  
+            platform: darwin-amd64
             arch: amd64
           - os: ubuntu-latest
             platform: linux-amd64
             arch: amd64
-          - os: ubuntu-latest
-            platform: linux-arm64
-            arch: arm64
-            cross: true
     
     runs-on: ${{ matrix.os }}
     
@@ -45,13 +41,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev nasm
-      
-      - name: Set up cross-compilation (Linux ARM64)
-        if: matrix.cross == true
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          echo "CMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/.github/toolchain-linux-arm64.cmake" >> $GITHUB_ENV
-      
+
       - name: Build C library
         run: |
           bash scripts/build-c-library.sh

@@ -69,18 +69,31 @@ else()
         )
         if(GCC_MULTIARCH)
             set(MULTIARCH_LIB_PATH "/usr/lib/${GCC_MULTIARCH}")
+            message(STATUS "Detected multiarch path: ${MULTIARCH_LIB_PATH}")
+        else()
+            message(STATUS "gcc -print-multiarch returned empty, using default paths")
         endif()
     endif()
 
     # jpeg
-    find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
-        PATHS ${MULTIARCH_LIB_PATH})
+    if(MULTIARCH_LIB_PATH)
+        find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg
+            PATHS ${MULTIARCH_LIB_PATH} /usr/lib /usr/local/lib)
+    else()
+        find_library(JPEG_LIBRARY NAMES libjpeg.a jpeg)
+    endif()
     find_path(JPEG_INCLUDE_DIR jpeglib.h)
+    message(STATUS "JPEG library: ${JPEG_LIBRARY}")
 
     # png
-    find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16
-        PATHS ${MULTIARCH_LIB_PATH})
+    if(MULTIARCH_LIB_PATH)
+        find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16
+            PATHS ${MULTIARCH_LIB_PATH} /usr/lib /usr/local/lib)
+    else()
+        find_library(PNG_LIBRARY NAMES libpng.a png libpng16.a png16)
+    endif()
     find_path(PNG_INCLUDE_DIR png.h)
+    message(STATUS "PNG library: ${PNG_LIBRARY}")
 endif()
 
 # zlib (macOS SDK or system library)
@@ -99,9 +112,14 @@ if(APPLE)
         NO_DEFAULT_PATH)
 else()
     # Linux/Windows: Use standard CMake find modules
-    find_library(Z_LIBRARY NAMES libz.a z
-        PATHS ${MULTIARCH_LIB_PATH})
+    if(MULTIARCH_LIB_PATH)
+        find_library(Z_LIBRARY NAMES libz.a z
+            PATHS ${MULTIARCH_LIB_PATH} /usr/lib /usr/local/lib)
+    else()
+        find_library(Z_LIBRARY NAMES libz.a z)
+    endif()
     find_path(Z_INCLUDE_DIR zlib.h)
+    message(STATUS "zlib library: ${Z_LIBRARY}")
 endif()
 
 # giflib
@@ -115,9 +133,14 @@ if(APPLE)
         NO_DEFAULT_PATH)
 else()
     # Linux/Windows: Use standard CMake find modules
-    find_library(GIF_LIBRARY NAMES libgif.a gif
-        PATHS ${MULTIARCH_LIB_PATH})
+    if(MULTIARCH_LIB_PATH)
+        find_library(GIF_LIBRARY NAMES libgif.a gif
+            PATHS ${MULTIARCH_LIB_PATH} /usr/lib /usr/local/lib)
+    else()
+        find_library(GIF_LIBRARY NAMES libgif.a gif)
+    endif()
     find_path(GIF_INCLUDE_DIR gif_lib.h)
+    message(STATUS "giflib library: ${GIF_LIBRARY}")
 endif()
 
 # 検出結果を表示
