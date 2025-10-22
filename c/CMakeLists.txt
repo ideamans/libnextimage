@@ -232,10 +232,14 @@ add_library(nextimage STATIC ${SOURCES})
 # 動的ライブラリのビルド
 add_library(nextimage_shared SHARED ${SOURCES})
 
+# 動的ライブラリの出力名を設定（全プラットフォーム共通）
+set_target_properties(nextimage_shared PROPERTIES
+    OUTPUT_NAME "nextimage"
+)
+
 # macOS: 動的ライブラリのインストール名を設定
 if(APPLE)
     set_target_properties(nextimage_shared PROPERTIES
-        OUTPUT_NAME "nextimage"
         INSTALL_NAME_DIR "@rpath"
         BUILD_WITH_INSTALL_RPATH TRUE
     )
