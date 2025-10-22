@@ -24,10 +24,11 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 
 # ビルド
 echo ""
-echo "=== Building nextimage library ==="
+echo "=== Building nextimage libraries (static and shared) ==="
 # CPUコア数を取得（クロスプラットフォーム対応）
 NCPUS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 cmake --build . --target nextimage --parallel $NCPUS
+cmake --build . --target nextimage_shared --parallel $NCPUS
 
 echo ""
 echo "=== Build complete ==="
