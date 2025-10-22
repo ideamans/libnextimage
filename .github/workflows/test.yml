@@ -88,12 +88,8 @@ jobs:
           grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
           echo ""
           echo "=== libnextimage.a contents ==="
-          if [ -f "lib/linux-amd64/libnextimage.a" ]; then
-            ar -t lib/linux-amd64/libnextimage.a | head -50
-          elif [ -f "lib/darwin-arm64/libnextimage.a" ]; then
-            ar -t lib/darwin-arm64/libnextimage.a | head -50
-          elif [ -f "lib/darwin-amd64/libnextimage.a" ]; then
-            ar -t lib/darwin-amd64/libnextimage.a | head -50
+          if [ -f "lib/static/libnextimage.a" ]; then
+            ar -t lib/static/libnextimage.a | head -50
           else
             echo "libnextimage.a not found"
           fi
@@ -132,8 +128,8 @@ jobs:
           grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
           echo ""
           echo "=== libnextimage.a contents ==="
-          if [ -f "lib/windows-amd64/libnextimage.a" ]; then
-            ar -t lib/windows-amd64/libnextimage.a | head -50
+          if [ -f "lib/static/libnextimage.a" ]; then
+            ar -t lib/static/libnextimage.a | head -50
           else
             echo "libnextimage.a not found"
           fi

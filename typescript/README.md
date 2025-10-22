@@ -13,9 +13,10 @@ From the project root:
 make install-c
 
 # This will create:
-# - lib/darwin-arm64/libnextimage.dylib (macOS)
-# - lib/linux-amd64/libnextimage.so (Linux)
-# - lib/windows-amd64/libnextimage.dll (Windows)
+# - lib/shared/libnextimage.dylib (macOS)
+# - lib/shared/libnextimage.so (Linux)
+# - lib/shared/libnextimage.dll (Windows)
+# - lib/include/*.h (headers)
 ```
 
 ### 2. Install TypeScript dependencies
@@ -39,7 +40,7 @@ node -e "console.log(require('./dist/index').getLibraryPath())"
 
 Expected output:
 ```
-/path/to/libnextimage/lib/darwin-arm64/libnextimage.dylib
+/path/to/libnextimage/lib/shared/libnextimage.dylib
 ```
 
 ## Project Structure

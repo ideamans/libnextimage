@@ -155,9 +155,9 @@ This provides:
 
 4. Copy files to your project:
    ```bash
-   # Example for darwin-arm64
-   cp lib/darwin-arm64/libnextimage.a /path/to/your/project/
-   cp -r include/* /path/to/your/project/include/
+   # Copy static library and headers
+   cp lib/static/libnextimage.a /path/to/your/project/
+   cp -r lib/include/* /path/to/your/project/include/
    ```
 
 5. Link in your build:
