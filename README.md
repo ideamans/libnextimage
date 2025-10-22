@@ -66,6 +66,25 @@ Then use it in your Go project:
 import "github.com/ideamans/libnextimage/golang"
 ```
 
+### For TypeScript/Node.js Users
+
+TypeScript bindings are available in the `typescript/` directory.
+
+```bash
+# 1. Build the shared library
+make install-c
+
+# 2. Setup TypeScript project
+cd typescript
+npm install
+npm run build
+
+# 3. Check library loading
+npm run check
+```
+
+See [typescript/README.md](typescript/README.md) for detailed documentation.
+
 ### For C/C++ Users
 
 #### Quick Install
