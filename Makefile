@@ -36,10 +36,15 @@ install-c:
 	@mkdir -p c/build
 	@cd c/build && cmake .. && $(MAKE) nextimage nextimage_shared && $(MAKE) install
 	@echo "Installed to lib/"
-	@ls -lh lib/*/libnextimage.a
+	@echo ""
+	@echo "Static library:"
+	@ls -lh lib/static/libnextimage.a 2>/dev/null || echo "  (not found)"
 	@echo ""
 	@echo "Shared libraries:"
-	@find lib -name "*.so" -o -name "*.dylib" -o -name "*.dll" | xargs ls -lh 2>/dev/null || echo "No shared libraries found"
+	@find lib/shared -name "*.so" -o -name "*.dylib" -o -name "*.dll" 2>/dev/null | xargs ls -lh 2>/dev/null || echo "  (not found)"
+	@echo ""
+	@echo "Header files:"
+	@ls lib/include/*.h 2>/dev/null | wc -l | xargs echo "  " "files in lib/include/" || echo "  (not found)"
 
 clean-c:
 	@echo "Cleaning C build artifacts..."
