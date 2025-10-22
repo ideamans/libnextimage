@@ -5,9 +5,9 @@ help:
 	@echo "libnextimage Build and Test Targets"
 	@echo ""
 	@echo "C Library:"
-	@echo "  make build-c      - Build C library (libnextimage.a)"
+	@echo "  make build-c      - Build C library (static .a and shared .so/.dylib/.dll)"
 	@echo "  make test-c       - Run C tests"
-	@echo "  make install-c    - Build and install C library to lib/"
+	@echo "  make install-c    - Build and install C libraries to lib/"
 	@echo "  make clean-c      - Clean C build artifacts"
 	@echo ""
 	@echo "Go Package:"
@@ -20,9 +20,9 @@ help:
 
 # C Library targets
 build-c:
-	@echo "Building C library..."
+	@echo "Building C library (static and shared)..."
 	@mkdir -p c/build
-	@cd c/build && cmake .. && $(MAKE) nextimage
+	@cd c/build && cmake .. && $(MAKE) nextimage nextimage_shared
 
 test-c: build-c
 	@echo "Running C tests..."
@@ -32,11 +32,14 @@ test-c: build-c
 	@echo "C tests completed (note: some test programs may have compilation issues)"
 
 install-c:
-	@echo "Building and installing C library..."
+	@echo "Building and installing C library (static and shared)..."
 	@mkdir -p c/build
-	@cd c/build && cmake .. && $(MAKE) nextimage && $(MAKE) install
+	@cd c/build && cmake .. && $(MAKE) nextimage nextimage_shared && $(MAKE) install
 	@echo "Installed to lib/"
 	@ls -lh lib/*/libnextimage.a
+	@echo ""
+	@echo "Shared libraries:"
+	@find lib -name "*.so" -o -name "*.dylib" -o -name "*.dll" | xargs ls -lh 2>/dev/null || echo "No shared libraries found"
 
 clean-c:
 	@echo "Cleaning C build artifacts..."

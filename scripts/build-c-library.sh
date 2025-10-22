@@ -59,9 +59,16 @@ if [ -d "$PROJECT_ROOT/lib" ]; then
         platform=$(basename $(dirname "$lib"))
         echo "  $platform/$(basename $lib): $(du -h "$lib" | cut -f1)"
     done
+
+    echo ""
+    echo "Shared libraries in lib/ directory:"
+    find "$PROJECT_ROOT/lib" \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) -type f | while read lib; do
+        platform=$(basename $(dirname "$lib"))
+        echo "  $platform/$(basename $lib): $(du -h "$lib" | cut -f1)"
+    done
 else
     echo "Warning: lib/ directory not created. Install may have failed."
 fi
 
 echo ""
-echo "Note: Use the combined library from lib/<platform>/libnextimage.a for Go bindings"
+echo "Note: Static library (*.a) for Go bindings, shared library (*.so/*.dylib/*.dll) for Node.js/FFI"

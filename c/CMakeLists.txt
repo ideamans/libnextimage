@@ -229,31 +229,60 @@ endif()
 # 静的ライブラリのビルド
 add_library(nextimage STATIC ${SOURCES})
 
+# 動的ライブラリのビルド
+add_library(nextimage_shared SHARED ${SOURCES})
+
 # nextimageターゲットのインクルードディレクトリを追加
 target_include_directories(nextimage PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
+)
+
+# nextimage_shared ターゲットのインクルードディレクトリを追加
+target_include_directories(nextimage_shared PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
 )
 
 # GIF support を有効化（giflibが見つかった場合のみ）
 if(GIF_LIBRARY AND GIF_INCLUDE_DIR)
     target_compile_definitions(nextimage PRIVATE WEBP_HAVE_GIF)
+    target_compile_definitions(nextimage_shared PRIVATE WEBP_HAVE_GIF)
 endif()
 
 # giflib のインクルードパスを nextimage ターゲットにも明示的に追加
 if(GIF_INCLUDE_DIR)
     target_include_directories(nextimage BEFORE PRIVATE ${GIF_INCLUDE_DIR})
+    target_include_directories(nextimage_shared BEFORE PRIVATE ${GIF_INCLUDE_DIR})
 endif()
 
 # libwebp と libavif のリンク - Goからはこのライブラリのみをリンクすれば良いように
 # webp, webpdemux, webpmux, sharpyuv, imagedec, imageenc, avif を内部依存として持たせる
 target_link_libraries(nextimage PUBLIC webp webpdemux libwebpmux sharpyuv imagedec imageenc avif)
+target_link_libraries(nextimage_shared PUBLIC webp webpdemux libwebpmux sharpyuv imagedec imageenc avif)
 
 # システムライブラリを静的リンク（libnextimage.aに含める）
 target_link_libraries(nextimage PUBLIC ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
 
+# 動的ライブラリも自己完結型にする - 依存ライブラリを静的にリンク
+# これにより、プレーンな環境でも動作可能になる
+target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+
+# macOS/Linux: リンカーに静的ライブラリを強制的に埋め込む
+if(UNIX)
+    # -Wl,--whole-archive は Linux で依存ライブラリ全体を含める
+    # macOS では -Wl,-all_load を使用
+    if(APPLE)
+        # macOS: 動的ライブラリに静的ライブラリの内容を埋め込む
+        target_link_options(nextimage_shared PRIVATE -Wl,-all_load)
+    else()
+        # Linux: 動的ライブラリに静的ライブラリの内容を埋め込む
+        target_link_options(nextimage_shared PRIVATE -Wl,--exclude-libs,ALL)
+    endif()
+endif()
+
 # giflib をリンク（見つかった場合）
 if(GIF_LIBRARY)
     target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
+    target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
 endif()
 
 # コンパイラ警告の有効化
@@ -264,8 +293,18 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wpedantic
         -Werror
     )
+    target_compile_options(nextimage_shared PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Werror
+    )
 elseif(MSVC)
     target_compile_options(nextimage PRIVATE
+        /W4
+        /WX
+    )
+    target_compile_options(nextimage_shared PRIVATE
         /W4
         /WX
     )
@@ -365,6 +404,34 @@ install(CODE "
     endif()
 
     message(STATUS \"Combined library installed to: \${LIB_DIR}/libnextimage.a\")
+")
+
+# 動的ライブラリのインストール
+install(CODE "
+    message(STATUS \"Installing shared library...\")
+
+    set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
+    file(MAKE_DIRECTORY \"\${LIB_DIR}\")
+
+    # Platform-specific shared library extension
+    if(APPLE)
+        set(SHARED_LIB_EXT \"dylib\")
+    elseif(WIN32)
+        set(SHARED_LIB_EXT \"dll\")
+    else()
+        set(SHARED_LIB_EXT \"so\")
+    endif()
+
+    # Copy shared library to platform directory
+    file(COPY \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage_shared.\${SHARED_LIB_EXT}\"
+         DESTINATION \"\${LIB_DIR}\")
+
+    # Rename to standard naming (remove _shared suffix)
+    file(RENAME
+         \"\${LIB_DIR}/libnextimage_shared.\${SHARED_LIB_EXT}\"
+         \"\${LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
+
+    message(STATUS \"Shared library installed to: \${LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
 ")
 
 install(FILES
@@ -482,3 +549,23 @@ add_test(NAME CommandInterfaceTest COMMAND command_interface_test)
 add_executable(decoder_test test/decoder_test.c)
 target_link_libraries(decoder_test nextimage)
 add_test(NAME DecoderTest COMMAND decoder_test)
+
+# ========================================
+# 動的ライブラリのテスト
+# ========================================
+# 動的ライブラリが正しくビルドされ、シンボルが正しくエクスポートされているか確認
+
+# シンプルテスト（動的ライブラリ版）
+add_executable(simple_test_shared test/simple_test.c)
+target_link_libraries(simple_test_shared nextimage_shared)
+add_test(NAME SimpleTestShared COMMAND simple_test_shared)
+
+# WebPテスト（動的ライブラリ版）
+add_executable(webp_test_shared test/webp_test.c)
+target_link_libraries(webp_test_shared nextimage_shared)
+add_test(NAME WebPTestShared COMMAND webp_test_shared)
+
+# AVIFテスト（動的ライブラリ版）
+add_executable(avif_test_shared test/avif_test.c)
+target_link_libraries(avif_test_shared nextimage_shared)
+add_test(NAME AVIFTestShared COMMAND avif_test_shared)
