@@ -3,15 +3,27 @@ package webp2gif
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../include
 
-// libnextimage.a is a fully self-contained static library
-// Only minimal system libraries are needed: zlib, C++, pthread, math
+// libnextimage.a is a fully self-contained static library that includes:
+// - webp, avif, aom (image codecs)
+// - jpeg, png, gif (system image libraries)
+//
+// Only minimal system libraries are needed:
+// - zlib: compression (required by PNG)
+// - C++ standard library: libavif and libaom are written in C++
+// - pthread: multi-threading support
+// - math library: mathematical functions
 
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-arm64 -lnextimage -lz -lc++ -lpthread -lm
-#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../lib/darwin-amd64 -lnextimage -lz -lc++ -lpthread -lm
-#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../lib/linux-arm64 -lnextimage -lz -lstdc++ -lpthread -lm
-#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../lib/linux-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
-#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../../lib/windows-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
-#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../../lib/other -lnextimage -lz -lstdc++ -lpthread -lm
+// Use full path to static library to avoid linking against shared library
+#cgo LDFLAGS: ${SRCDIR}/../../lib/static/libnextimage.a
+
+// macOS
+#cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
+
+// Linux
+#cgo linux LDFLAGS: -lz -lstdc++ -lpthread -lm
+
+// Windows (MSYS2/MinGW)
+#cgo windows LDFLAGS: -lz -lstdc++ -lpthread -lm
 
 #include <stdlib.h>
 #include <string.h>

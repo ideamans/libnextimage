@@ -14,7 +14,7 @@ package libnextimage
 // - math library: mathematical functions
 
 // Use full path to static library to avoid linking against shared library
-#cgo LDFLAGS: ${SRCDIR}/../lib/libnextimage.a
+#cgo LDFLAGS: ${SRCDIR}/../lib/static/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm

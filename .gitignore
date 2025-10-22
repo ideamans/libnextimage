@@ -136,21 +136,15 @@ docs/_build/
 site/
 
 # ========================================
-# Platform-Specific Libraries
+# Library Output Directories
 # ========================================
-# Keep placeholder .gitkeep files but ignore actual libraries
-lib/darwin-arm64/*
-!lib/darwin-arm64/.gitkeep
-lib/darwin-amd64/*
-!lib/darwin-amd64/.gitkeep
-lib/linux-amd64/*
-!lib/linux-amd64/.gitkeep
-lib/linux-arm64/*
-!lib/linux-arm64/.gitkeep
-lib/windows-amd64/*
-!lib/windows-amd64/.gitkeep
-lib/other/*
-!lib/other/.gitkeep
+# Ignore built libraries but keep directory structure
+lib/static/*
+!lib/static/.gitkeep
+lib/shared/*
+!lib/shared/.gitkeep
+lib/include/*
+!lib/include/.gitkeep
 
 # ========================================
 # Dependencies (will be git submodules)
