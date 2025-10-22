@@ -275,9 +275,16 @@ target_link_libraries(nextimage_shared PUBLIC webp webpdemux libwebpmux sharpyuv
 # システムライブラリを静的リンク（libnextimage.aに含める）
 target_link_libraries(nextimage PUBLIC ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
 
-# 動的ライブラリも自己完結型にする - 依存ライブラリを静的にリンク
-# これにより、プレーンな環境でも動作可能になる
-target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+# 動的ライブラリのシステムライブラリリンク
+# Linux: 共有ライブラリには動的ライブラリをリンク（-fPIC問題回避）
+# macOS: 静的ライブラリで問題なし
+if(UNIX AND NOT APPLE)
+    # Linux: 動的ライブラリを使用
+    target_link_libraries(nextimage_shared PRIVATE jpeg png z)
+else()
+    # macOS/Windows: 静的ライブラリを使用
+    target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+endif()
 
 # macOS/Linux: リンカーに静的ライブラリを強制的に埋め込む
 if(UNIX)
@@ -295,7 +302,13 @@ endif()
 # giflib をリンク（見つかった場合）
 if(GIF_LIBRARY)
     target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
-    target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
+
+    # 共有ライブラリ向け: Linux は動的、それ以外は静的
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(nextimage_shared PRIVATE gif)
+    else()
+        target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
+    endif()
 endif()
 
 # コンパイラ警告の有効化
