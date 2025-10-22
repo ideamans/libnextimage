@@ -44,6 +44,11 @@ golang/go.work.sum
 # Vendor (if used)
 golang/vendor/
 
+# Example binaries
+examples/golang/jpeg_to_webp
+examples/golang/jpeg_to_avif
+examples/golang/batch_convert
+
 # ========================================
 # Test Outputs
 # ========================================

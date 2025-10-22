@@ -1,7 +1,7 @@
 package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../lib/include
+#cgo CFLAGS: -I${SRCDIR}/../include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -14,7 +14,7 @@ package libnextimage
 // - math library: mathematical functions
 
 // Use full path to static library to avoid linking against shared library
-#cgo LDFLAGS: ${SRCDIR}/../lib/static/libnextimage.a
+#cgo LDFLAGS: ${SRCDIR}/../lib/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm

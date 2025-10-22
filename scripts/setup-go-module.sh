@@ -52,7 +52,7 @@ echo "Platform: $PLATFORM_ARCH"
 echo ""
 
 # Get version (default to latest or specified version)
-VERSION="${1:-v0.3.0}"
+VERSION="${1:-v0.4.0}"
 if [[ "$VERSION" != v* ]]; then
   VERSION="v$VERSION"
 fi
@@ -90,9 +90,17 @@ echo "Module path: $MODULE_PATH"
 echo ""
 
 # Check if library already exists
-LIB_PATH="$MODULE_PATH/lib/$PLATFORM_ARCH/libnextimage.a"
-if [ -f "$LIB_PATH" ]; then
-  echo "✅ Library already installed at: $LIB_PATH"
+# v0.4.0+: lib/libnextimage.a (new structure)
+# v0.3.0 and earlier: lib/$PLATFORM_ARCH/libnextimage.a (old structure)
+LIB_PATH="$MODULE_PATH/lib/libnextimage.a"
+OLD_LIB_PATH="$MODULE_PATH/lib/$PLATFORM_ARCH/libnextimage.a"
+
+if [ -f "$LIB_PATH" ] || [ -f "$OLD_LIB_PATH" ]; then
+  INSTALLED_PATH="${LIB_PATH}"
+  if [ ! -f "$LIB_PATH" ]; then
+    INSTALLED_PATH="${OLD_LIB_PATH}"
+  fi
+  echo "✅ Library already installed at: $INSTALLED_PATH"
   read -p "Do you want to reinstall? (y/N): " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -134,6 +142,23 @@ if [ ! -w "$MODULE_PATH" ]; then
     echo "  sudo bash $0"
     exit 1
   }
+fi
+
+# Clean up old directory structure if it exists
+# v0.3.0 and earlier had: lib/$PLATFORM_ARCH/, include/
+# v0.4.0+ has: lib/libnextimage.a, include/
+if [ -d "$MODULE_PATH/lib/$PLATFORM_ARCH" ]; then
+  echo "Removing old platform-specific directory structure..."
+  chmod -R +w "$MODULE_PATH/lib" 2>/dev/null || true
+  rm -rf "$MODULE_PATH/lib/$PLATFORM_ARCH"
+fi
+
+# Make existing directories writable for overwrite
+if [ -d "$MODULE_PATH/lib" ]; then
+  chmod -R +w "$MODULE_PATH/lib" 2>/dev/null || true
+fi
+if [ -d "$MODULE_PATH/include" ]; then
+  chmod -R +w "$MODULE_PATH/include" 2>/dev/null || true
 fi
 
 cd "$MODULE_PATH"
