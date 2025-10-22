@@ -232,6 +232,15 @@ add_library(nextimage STATIC ${SOURCES})
 # 動的ライブラリのビルド
 add_library(nextimage_shared SHARED ${SOURCES})
 
+# macOS: 動的ライブラリのインストール名を設定
+if(APPLE)
+    set_target_properties(nextimage_shared PROPERTIES
+        OUTPUT_NAME "nextimage"
+        INSTALL_NAME_DIR "@rpath"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endif()
+
 # nextimageターゲットのインクルードディレクトリを追加
 target_include_directories(nextimage PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../deps/libwebp/imageio
@@ -423,13 +432,9 @@ install(CODE "
     endif()
 
     # Copy shared library to platform directory
-    file(COPY \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage_shared.\${SHARED_LIB_EXT}\"
+    # On macOS, the library is now named libnextimage.dylib directly
+    file(COPY \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.\${SHARED_LIB_EXT}\"
          DESTINATION \"\${LIB_DIR}\")
-
-    # Rename to standard naming (remove _shared suffix)
-    file(RENAME
-         \"\${LIB_DIR}/libnextimage_shared.\${SHARED_LIB_EXT}\"
-         \"\${LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
 
     message(STATUS \"Shared library installed to: \${LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
 ")
