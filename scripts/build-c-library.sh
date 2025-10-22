@@ -44,32 +44,31 @@ echo ""
 echo "=== Installing combined library ==="
 cmake --install . --prefix "$PROJECT_ROOT"
 
-# ヘッダファイルのコピー
-echo ""
-echo "=== Installing header files ==="
-mkdir -p "$PROJECT_ROOT/include/nextimage"
-cp "$PROJECT_ROOT/c/include"/*.h "$PROJECT_ROOT/include/"
-cp "$PROJECT_ROOT/c/include/nextimage"/*.h "$PROJECT_ROOT/include/nextimage/"
-echo "Header files installed to include/"
-
 echo ""
 # 統合されたライブラリの確認
 if [ -d "$PROJECT_ROOT/lib" ]; then
-    echo "Combined libraries in lib/ directory:"
-    find "$PROJECT_ROOT/lib" -name "*.a" -type f | while read lib; do
-        platform=$(basename $(dirname "$lib"))
-        echo "  $platform/$(basename $lib): $(du -h "$lib" | cut -f1)"
-    done
+    echo "Library structure:"
+    echo ""
+
+    if [ -f "$PROJECT_ROOT/lib/static/libnextimage.a" ]; then
+        echo "Static library:"
+        echo "  lib/static/libnextimage.a: $(du -h "$PROJECT_ROOT/lib/static/libnextimage.a" | cut -f1)"
+    fi
 
     echo ""
-    echo "Shared libraries in lib/ directory:"
-    find "$PROJECT_ROOT/lib" \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) -type f | while read lib; do
-        platform=$(basename $(dirname "$lib"))
-        echo "  $platform/$(basename $lib): $(du -h "$lib" | cut -f1)"
-    done
+    echo "Shared libraries:"
+    find "$PROJECT_ROOT/lib/shared" \( -name "*.so" -o -name "*.dylib" -o -name "*.dll" \) -type f 2>/dev/null | while read lib; do
+        echo "  lib/shared/$(basename $lib): $(du -h "$lib" | cut -f1)"
+    done || echo "  (none found)"
+
+    echo ""
+    echo "Header files:"
+    find "$PROJECT_ROOT/lib/include" -name "*.h" -type f 2>/dev/null | while read hdr; do
+        echo "  lib/include/$(basename $hdr)"
+    done || echo "  (none found)"
 else
     echo "Warning: lib/ directory not created. Install may have failed."
 fi
 
 echo ""
-echo "Note: Static library (*.a) for Go bindings, shared library (*.so/*.dylib/*.dll) for Node.js/FFI"
+echo "Note: Static library (lib/static) for Go bindings, shared library (lib/shared) for TypeScript/FFI"

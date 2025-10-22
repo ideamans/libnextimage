@@ -48,11 +48,7 @@ clean-c:
 # Go Package targets
 test-go:
 	@echo "Running Go tests..."
-	@if [ "$$(uname)" = "Darwin" ]; then \
-		cd golang && CGO_LDFLAGS="-Wl,-rpath,$$(pwd)/../lib/darwin-arm64" go test -v -timeout 30s; \
-	else \
-		cd golang && LD_LIBRARY_PATH="$$(pwd)/../lib/linux-amd64:$$(pwd)/../lib/linux-arm64:$$(pwd)/../c/build:$$LD_LIBRARY_PATH" go test -v -timeout 30s; \
-	fi
+	@cd golang && go test -v -timeout 30s
 
 # Combined targets
 test-all: test-c test-go

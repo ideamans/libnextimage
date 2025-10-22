@@ -1,7 +1,7 @@
 package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../include
+#cgo CFLAGS: -I${SRCDIR}/../lib/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -13,19 +13,17 @@ package libnextimage
 // - pthread: multi-threading support
 // - math library: mathematical functions
 
+// Use full path to static library to avoid linking against shared library
+#cgo LDFLAGS: ${SRCDIR}/../lib/static/libnextimage.a
+
 // macOS
-#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../lib/darwin-arm64 -lnextimage -lz -lc++ -lpthread -lm
-#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../lib/darwin-amd64 -lnextimage -lz -lc++ -lpthread -lm
+#cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
 
 // Linux
-#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../lib/linux-arm64 -lnextimage -lz -lstdc++ -lpthread -lm
-#cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../lib/linux-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo linux LDFLAGS: -lz -lstdc++ -lpthread -lm
 
 // Windows (MSYS2/MinGW)
-#cgo windows,amd64 LDFLAGS: -L${SRCDIR}/../lib/windows-amd64 -lnextimage -lz -lstdc++ -lpthread -lm
-
-// Other platforms
-#cgo !darwin,!linux,!windows LDFLAGS: -L${SRCDIR}/../lib/other -lnextimage -lz -lstdc++ -lpthread -lm
+#cgo windows LDFLAGS: -lz -lstdc++ -lpthread -lm
 
 #include "nextimage.h"
 #include "webp.h"

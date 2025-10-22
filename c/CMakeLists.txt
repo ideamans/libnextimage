@@ -344,8 +344,8 @@ endif()
 install(CODE "
     message(STATUS \"Combining static libraries into libnextimage.a...\")
 
-    set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
-    file(MAKE_DIRECTORY \"\${LIB_DIR}\")
+    set(STATIC_LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/static\")
+    file(MAKE_DIRECTORY \"\${STATIC_LIB_DIR}\")
 
     # Collect required libraries
     set(LIBS_TO_COMBINE
@@ -397,12 +397,12 @@ install(CODE "
     if(APPLE)
         # macOS: use libtool -static (properly handles nested archives)
         execute_process(
-            COMMAND libtool -static -o \"\${LIB_DIR}/libnextimage.a\" \${LIBS_TO_COMBINE}
+            COMMAND libtool -static -o \"\${STATIC_LIB_DIR}/libnextimage.a\" \${LIBS_TO_COMBINE}
         )
     else()
         # Linux/Windows: use ar MRI script
         set(MRI_SCRIPT \"\${CMAKE_CURRENT_BINARY_DIR}/combine.mri\")
-        file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${LIB_DIR}/libnextimage.a\\n\")
+        file(WRITE \"\${MRI_SCRIPT}\" \"CREATE \${STATIC_LIB_DIR}/libnextimage.a\\n\")
         foreach(LIB \${LIBS_TO_COMBINE})
             file(APPEND \"\${MRI_SCRIPT}\" \"ADDLIB \${LIB}\\n\")
         endforeach()
@@ -412,19 +412,19 @@ install(CODE "
             INPUT_FILE \"\${MRI_SCRIPT}\"
         )
         execute_process(
-            COMMAND ranlib \"\${LIB_DIR}/libnextimage.a\"
+            COMMAND ranlib \"\${STATIC_LIB_DIR}/libnextimage.a\"
         )
     endif()
 
-    message(STATUS \"Combined library installed to: \${LIB_DIR}/libnextimage.a\")
+    message(STATUS \"Combined library installed to: \${STATIC_LIB_DIR}/libnextimage.a\")
 ")
 
 # 動的ライブラリのインストール
 install(CODE "
     message(STATUS \"Installing shared library...\")
 
-    set(LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/${PLATFORM}\")
-    file(MAKE_DIRECTORY \"\${LIB_DIR}\")
+    set(SHARED_LIB_DIR \"${CMAKE_CURRENT_SOURCE_DIR}/../lib/shared\")
+    file(MAKE_DIRECTORY \"\${SHARED_LIB_DIR}\")
 
     # Platform-specific shared library extension
     if(APPLE)
@@ -435,19 +435,26 @@ install(CODE "
         set(SHARED_LIB_EXT \"so\")
     endif()
 
-    # Copy shared library to platform directory
-    # On macOS, the library is now named libnextimage.dylib directly
+    # Copy shared library to shared directory
     file(COPY \"${CMAKE_CURRENT_BINARY_DIR}/libnextimage.\${SHARED_LIB_EXT}\"
-         DESTINATION \"\${LIB_DIR}\")
+         DESTINATION \"\${SHARED_LIB_DIR}\")
 
-    message(STATUS \"Shared library installed to: \${LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
+    message(STATUS \"Shared library installed to: \${SHARED_LIB_DIR}/libnextimage.\${SHARED_LIB_EXT}\")
 ")
 
+# ヘッダファイルのインストール
 install(FILES
     include/nextimage.h
     include/webp.h
     include/avif.h
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+)
+
+# nextimage サブディレクトリのヘッダファイルもインストール
+install(DIRECTORY
+    include/nextimage
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../lib/include
+    FILES_MATCHING PATTERN "*.h"
 )
 
 # テスト有効化
