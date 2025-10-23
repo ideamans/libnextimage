@@ -14,8 +14,10 @@ export {
   clearLibraryPathCache
 } from './library';
 
-// Export WebP functions
-export { encodeWebP, decodeWebP } from './webp';
+// Export WebP classes
+export { WebPEncoder } from './webp-encoder';
+export { WebPDecoder } from './webp-decoder';
 
-// Export AVIF functions
-export { encodeAVIF, decodeAVIF } from './avif';
+// Export AVIF classes
+export { AVIFEncoder } from './avif-encoder';
+export { AVIFDecoder } from './avif-decoder';

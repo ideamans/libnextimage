@@ -312,6 +312,66 @@ export const nextimage_webp_decode_size = lib.func(
 );
 
 /**
+ * WebP Encoder/Decoder Instance Functions
+ */
+
+// NextImageWebPEncoder* nextimage_webp_encoder_create(const NextImageWebPEncodeOptions* options)
+export const nextimage_webp_encoder_create = lib.func(
+  'nextimage_webp_encoder_create',
+  koffi.pointer('void'),  // NextImageWebPEncoder*
+  [koffi.pointer(NextImageWebPEncodeOptionsStruct)]
+);
+
+// NextImageStatus nextimage_webp_encoder_encode(NextImageWebPEncoder* encoder,
+//                                                 const uint8_t* input_data, size_t input_size,
+//                                                 NextImageBuffer* output)
+export const nextimage_webp_encoder_encode = lib.func(
+  'nextimage_webp_encoder_encode',
+  koffi.types.int,  // NextImageStatus
+  [
+    koffi.pointer('void'),  // NextImageWebPEncoder*
+    koffi.pointer(koffi.types.uint8),
+    koffi.types.size_t,
+    koffi.pointer(NextImageBufferStruct)
+  ]
+);
+
+// void nextimage_webp_encoder_destroy(NextImageWebPEncoder* encoder)
+export const nextimage_webp_encoder_destroy = lib.func(
+  'nextimage_webp_encoder_destroy',
+  koffi.types.void,
+  [koffi.pointer('void')]  // NextImageWebPEncoder*
+);
+
+// NextImageWebPDecoder* nextimage_webp_decoder_create(const NextImageWebPDecodeOptions* options)
+export const nextimage_webp_decoder_create = lib.func(
+  'nextimage_webp_decoder_create',
+  koffi.pointer('void'),  // NextImageWebPDecoder*
+  [koffi.pointer(NextImageWebPDecodeOptionsStruct)]
+);
+
+// NextImageStatus nextimage_webp_decoder_decode(NextImageWebPDecoder* decoder,
+//                                                 const uint8_t* webp_data, size_t webp_size,
+//                                                 NextImageDecodeBuffer* output)
+export const nextimage_webp_decoder_decode = lib.func(
+  'nextimage_webp_decoder_decode',
+  koffi.types.int,  // NextImageStatus
+  [
+    koffi.pointer('void'),  // NextImageWebPDecoder*
+    koffi.pointer(koffi.types.uint8),
+    koffi.types.size_t,
+    koffi.pointer(NextImageDecodeBufferStruct)
+  ]
+);
+
+// void nextimage_webp_decoder_destroy(NextImageWebPDecoder* decoder)
+export const nextimage_webp_decoder_destroy = lib.func(
+  'nextimage_webp_decoder_destroy',
+  koffi.types.void,
+  [koffi.pointer('void')]  // NextImageWebPDecoder*
+);
+
+/**
  * AVIF Functions
  */
 
@@ -368,6 +428,66 @@ export const nextimage_avif_decode_size = lib.func(
     koffi.pointer(koffi.types.int),
     koffi.pointer(koffi.types.size_t)
   ]
+);
+
+/**
+ * AVIF Encoder/Decoder Instance Functions
+ */
+
+// NextImageAVIFEncoder* nextimage_avif_encoder_create(const NextImageAVIFEncodeOptions* options)
+export const nextimage_avif_encoder_create = lib.func(
+  'nextimage_avif_encoder_create',
+  koffi.pointer('void'),  // NextImageAVIFEncoder*
+  [koffi.pointer(NextImageAVIFEncodeOptionsStruct)]
+);
+
+// NextImageStatus nextimage_avif_encoder_encode(NextImageAVIFEncoder* encoder,
+//                                                 const uint8_t* input_data, size_t input_size,
+//                                                 NextImageBuffer* output)
+export const nextimage_avif_encoder_encode = lib.func(
+  'nextimage_avif_encoder_encode',
+  koffi.types.int,  // NextImageStatus
+  [
+    koffi.pointer('void'),  // NextImageAVIFEncoder*
+    koffi.pointer(koffi.types.uint8),
+    koffi.types.size_t,
+    koffi.pointer(NextImageBufferStruct)
+  ]
+);
+
+// void nextimage_avif_encoder_destroy(NextImageAVIFEncoder* encoder)
+export const nextimage_avif_encoder_destroy = lib.func(
+  'nextimage_avif_encoder_destroy',
+  koffi.types.void,
+  [koffi.pointer('void')]  // NextImageAVIFEncoder*
+);
+
+// NextImageAVIFDecoder* nextimage_avif_decoder_create(const NextImageAVIFDecodeOptions* options)
+export const nextimage_avif_decoder_create = lib.func(
+  'nextimage_avif_decoder_create',
+  koffi.pointer('void'),  // NextImageAVIFDecoder*
+  [koffi.pointer(NextImageAVIFDecodeOptionsStruct)]
+);
+
+// NextImageStatus nextimage_avif_decoder_decode(NextImageAVIFDecoder* decoder,
+//                                                 const uint8_t* avif_data, size_t avif_size,
+//                                                 NextImageDecodeBuffer* output)
+export const nextimage_avif_decoder_decode = lib.func(
+  'nextimage_avif_decoder_decode',
+  koffi.types.int,  // NextImageStatus
+  [
+    koffi.pointer('void'),  // NextImageAVIFDecoder*
+    koffi.pointer(koffi.types.uint8),
+    koffi.types.size_t,
+    koffi.pointer(NextImageDecodeBufferStruct)
+  ]
+);
+
+// void nextimage_avif_decoder_destroy(NextImageAVIFDecoder* decoder)
+export const nextimage_avif_decoder_destroy = lib.func(
+  'nextimage_avif_decoder_destroy',
+  koffi.types.void,
+  [koffi.pointer('void')]  // NextImageAVIFDecoder*
 );
 
 /**

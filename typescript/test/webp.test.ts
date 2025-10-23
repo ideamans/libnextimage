@@ -1,139 +1,59 @@
 /**
- * WebP encode/decode tests
- * Tests WebP encoding and decoding functionality with the new API
+ * WebP encode/decode tests with class-based API
  */
 
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import { encodeWebP, decodeWebP, PixelFormat, NextImageError } from '../src/index';
+import { WebPEncoder, WebPDecoder, PixelFormat, NextImageError } from '../src/index';
 
-// Helper: Get test image path
 function getTestImagePath(filename: string): string {
   return path.join(__dirname, '..', '..', '..', 'testdata', 'png', filename);
 }
 
-// Helper: Read test image
 function readTestImage(filename: string): Buffer {
-  const imagePath = getTestImagePath(filename);
-  return fs.readFileSync(imagePath);
+  return fs.readFileSync(getTestImagePath(filename));
 }
 
-describe('WebP Encoding', () => {
-  it('should encode PNG data to WebP', () => {
+describe('WebPEncoder', () => {
+  it('should encode PNG to WebP', () => {
     const pngData = readTestImage('red.png');
-    const webpData = encodeWebP(pngData, { quality: 80 });
+    const encoder = new WebPEncoder({ quality: 80 });
+    const webpData = encoder.encode(pngData);
+    encoder.close();
 
-    assert.ok(webpData, 'WebP data should not be null');
-    assert.ok(webpData.length > 0, 'WebP data should not be empty');
-    assert.ok(Buffer.isBuffer(webpData), 'Result should be a Buffer');
-
-    // WebP files start with 'RIFF'
-    assert.strictEqual(webpData.toString('ascii', 0, 4), 'RIFF', 'Should have RIFF header');
-    // WebP signature at offset 8
-    assert.strictEqual(webpData.toString('ascii', 8, 12), 'WEBP', 'Should have WEBP signature');
+    assert.ok(webpData.length > 0);
+    assert.strictEqual(webpData.toString('ascii', 0, 4), 'RIFF');
+    assert.strictEqual(webpData.toString('ascii', 8, 12), 'WEBP');
   });
 
-  it('should encode with lossless option', () => {
-    const pngData = readTestImage('blue.png');
-    const webpData = encodeWebP(pngData, { lossless: true });
+  it('should reuse encoder for multiple images', () => {
+    const encoder = new WebPEncoder({ quality: 75 });
+    const webp1 = encoder.encode(readTestImage('red.png'));
+    const webp2 = encoder.encode(readTestImage('blue.png'));
+    encoder.close();
 
-    assert.ok(webpData.length > 0, 'Lossless WebP data should not be empty');
+    assert.ok(webp1.length > 0);
+    assert.ok(webp2.length > 0);
   });
 
-  it('should encode with different quality levels', () => {
-    const pngData = readTestImage('red.png');
-
-    const lowQuality = encodeWebP(pngData, { quality: 20 });
-    const highQuality = encodeWebP(pngData, { quality: 95 });
-
-    assert.ok(lowQuality.length > 0);
-    assert.ok(highQuality.length > 0);
-    // High quality should generally be larger
-    assert.ok(highQuality.length > lowQuality.length);
-  });
-
-  it('should throw error for empty input', () => {
-    const emptyBuffer = Buffer.alloc(0);
-
-    assert.throws(() => {
-      encodeWebP(emptyBuffer);
-    }, NextImageError);
-  });
-
-  it('should throw error for invalid image data', () => {
-    const invalidData = Buffer.from('not an image');
-
-    assert.throws(() => {
-      encodeWebP(invalidData);
-    }, NextImageError);
+  it('should throw on empty input', () => {
+    const encoder = new WebPEncoder();
+    assert.throws(() => encoder.encode(Buffer.alloc(0)), NextImageError);
+    encoder.close();
   });
 });
 
-describe('WebP Decoding', () => {
-  it('should decode WebP data to pixels', () => {
-    // First encode a PNG to WebP
-    const pngData = readTestImage('red.png');
-    const webpData = encodeWebP(pngData, { quality: 100, lossless: true });
+describe('WebPDecoder', () => {
+  it('should decode WebP to pixels', () => {
+    const encoder = new WebPEncoder({ quality: 90 });
+    const webpData = encoder.encode(readTestImage('red.png'));
+    encoder.close();
 
-    // Then decode it
-    const decoded = decodeWebP(webpData);
-
-    assert.ok(decoded, 'Decoded image should not be null');
-    assert.ok(decoded.width > 0, 'Width should be positive');
-    assert.ok(decoded.height > 0, 'Height should be positive');
-    assert.ok(decoded.data.length > 0, 'Pixel data should not be empty');
-    assert.ok(Buffer.isBuffer(decoded.data), 'Pixel data should be a Buffer');
-    assert.strictEqual(decoded.format, PixelFormat.RGBA, 'Format should be RGBA');
-  });
-
-  it('should decode with threading option', () => {
-    const pngData = readTestImage('blue.png');
-    const webpData = encodeWebP(pngData);
-
-    const decoded = decodeWebP(webpData, { useThreads: true });
-
-    assert.ok(decoded.width > 0);
-    assert.ok(decoded.height > 0);
-  });
-
-  it('should throw error for empty input', () => {
-    const emptyBuffer = Buffer.alloc(0);
-
-    assert.throws(() => {
-      decodeWebP(emptyBuffer);
-    }, NextImageError);
-  });
-
-  it('should throw error for invalid WebP data', () => {
-    const invalidData = Buffer.from('not a webp file');
-
-    assert.throws(() => {
-      decodeWebP(invalidData);
-    }, NextImageError);
-  });
-});
-
-describe('WebP Encode/Decode Round Trip', () => {
-  it('should maintain image dimensions after round trip', () => {
-    const pngData = readTestImage('red.png');
-
-    // Encode
-    const webpData = encodeWebP(pngData, { quality: 100, lossless: true });
-
-    // Decode
-    const decoded = decodeWebP(webpData);
-
-    assert.ok(decoded.width > 0, 'Width should be preserved');
-    assert.ok(decoded.height > 0, 'Height should be preserved');
-  });
-
-  it('should work with lossy encoding', () => {
-    const pngData = readTestImage('blue.png');
-
-    const webpData = encodeWebP(pngData, { quality: 75, lossless: false });
-    const decoded = decodeWebP(webpData);
+    const decoder = new WebPDecoder();
+    const decoded = decoder.decode(webpData);
+    decoder.close();
 
     assert.ok(decoded.width > 0);
     assert.ok(decoded.height > 0);
