@@ -3,10 +3,13 @@ package libnextimage
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/ideamans/libnextimage/golang/avifenc"
 )
 
 // setupAVIFCompatTest ensures avifenc/avifdec are available
@@ -191,7 +194,7 @@ func TestCompat_AVIF_EncodeQuality(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.Quality = tc.quality
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -245,7 +248,7 @@ func TestCompat_AVIF_EncodeSpeed(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.Speed = tc.speed
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -294,7 +297,7 @@ func TestCompat_AVIF_EncodeDepth(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.BitDepth = tc.bitDepth
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -353,7 +356,7 @@ func TestCompat_AVIF_EncodeYUVFormat(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.YUVFormat = tc.yuvFormat
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -381,7 +384,7 @@ func TestCompat_AVIF_Decode(t *testing.T) {
 	}
 	opts.XMPData = []byte(`<?xml version="1.0"?><x:xmpmeta xmlns:x="adobe:ns:meta/"></x:xmpmeta>`)
 
-	avifData, err := AVIFEncodeFile(inputPath, opts)
+	avifData, err := encodeAVIFWithLibrary(inputPath, opts)
 	if err != nil {
 		t.Fatalf("failed to create test AVIF: %v", err)
 	}
@@ -488,7 +491,7 @@ func TestCompat_AVIF_RoundTrip(t *testing.T) {
 			opts := DefaultAVIFEncodeOptions()
 			opts.Quality = tc.quality
 			opts.Speed = tc.speed
-			avifData, err := AVIFEncodeFile(inputPath, opts)
+			avifData, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("encoding failed: %v", err)
 			}
@@ -550,7 +553,7 @@ func TestCompat_AVIF_QualityAlpha(t *testing.T) {
 			opts := DefaultAVIFEncodeOptions()
 			opts.Quality = tc.quality
 			opts.QualityAlpha = tc.qualityAlpha
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -597,7 +600,7 @@ func TestCompat_AVIF_YUVRange(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.YUVRange = tc.yuvRange
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -649,7 +652,7 @@ func TestCompat_AVIF_CICP(t *testing.T) {
 			opts.ColorPrimaries = tc.colorPrimaries
 			opts.TransferCharacteristics = tc.transferCharacteristics
 			opts.MatrixCoefficients = tc.matrixCoefficients
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -797,7 +800,7 @@ func TestCompat_AVIF_Metadata(t *testing.T) {
 				opts.ICCData = iccData
 			}
 
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -868,7 +871,7 @@ func TestCompat_AVIF_Transformations(t *testing.T) {
 				opts.IMirAxis = tc.imirAxis
 			}
 
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -916,7 +919,7 @@ func TestCompat_AVIF_PASP(t *testing.T) {
 			opts := DefaultAVIFEncodeOptions()
 			opts.PASP = [2]int{tc.hSpacing, tc.vSpacing}
 
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -964,7 +967,7 @@ func TestCompat_AVIF_CLLI(t *testing.T) {
 			opts := DefaultAVIFEncodeOptions()
 			opts.CLLI = [2]int{tc.maxCLL, tc.maxPALL}
 
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -1013,7 +1016,7 @@ func TestCompat_AVIF_Tiling(t *testing.T) {
 			opts.TileRowsLog2 = tc.tileRowsLog2
 			opts.TileColsLog2 = tc.tileColsLog2
 
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -1061,7 +1064,7 @@ func TestCompat_AVIF_Lossless(t *testing.T) {
 			opts := DefaultAVIFEncodeOptions()
 			opts.Quality = tc.quality
 			opts.MatrixCoefficients = tc.matrixCoefficients
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -1105,7 +1108,7 @@ func TestCompat_AVIF_PremultiplyAlpha(t *testing.T) {
 			// Run library encoding
 			opts := DefaultAVIFEncodeOptions()
 			opts.PremultiplyAlpha = tc.premultiplyAlpha
-			libOutput, err := AVIFEncodeFile(inputPath, opts)
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
 			if err != nil {
 				t.Fatalf("library encoding failed: %v", err)
 			}
@@ -1124,7 +1127,7 @@ func TestCompat_AVIF_DecodeSecurityLimits(t *testing.T) {
 	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
 	opts := DefaultAVIFEncodeOptions()
 	opts.Quality = 75
-	avifData, err := AVIFEncodeFile(inputPath, opts)
+	avifData, err := encodeAVIFWithLibrary(inputPath, opts)
 	if err != nil {
 		t.Fatalf("failed to create test AVIF: %v", err)
 	}
@@ -1192,7 +1195,7 @@ func TestCompat_AVIF_DecodeStrictFlags(t *testing.T) {
 	inputPath := filepath.Join(testdataDir, "source/sizes/medium-512x512.png")
 	opts := DefaultAVIFEncodeOptions()
 	opts.Quality = 75
-	avifData, err := AVIFEncodeFile(inputPath, opts)
+	avifData, err := encodeAVIFWithLibrary(inputPath, opts)
 	if err != nil {
 		t.Fatalf("failed to create test AVIF: %v", err)
 	}
@@ -1239,3 +1242,62 @@ func TestCompat_AVIF_DecodeStrictFlags(t *testing.T) {
 // - SharpYUV requires libsharpyuv which may not be available in all avifenc builds
 // - TargetSize is implemented in avifenc as a multi-pass encoding loop, not a direct libavif API
 // These features are available in the library API but cannot be easily tested against avifenc
+
+// convertToAVIFEncOptions converts AVIFEncodeOptions to avifenc.Options
+func convertToAVIFEncOptions(opts AVIFEncodeOptions) avifenc.Options {
+	return avifenc.Options{
+		Quality:                 opts.Quality,
+		QualityAlpha:            opts.QualityAlpha,
+		Speed:                   opts.Speed,
+		MinQuantizer:            opts.MinQuantizer,
+		MaxQuantizer:            opts.MaxQuantizer,
+		MinQuantizerAlpha:       opts.MinQuantizerAlpha,
+		MaxQuantizerAlpha:       opts.MaxQuantizerAlpha,
+		BitDepth:                opts.BitDepth,
+		YUVFormat:               int(opts.YUVFormat),
+		YUVRange:                int(opts.YUVRange),
+		EnableAlpha:             opts.EnableAlpha,
+		PremultiplyAlpha:        opts.PremultiplyAlpha,
+		TileRowsLog2:            opts.TileRowsLog2,
+		TileColsLog2:            opts.TileColsLog2,
+		ColorPrimaries:          opts.ColorPrimaries,
+		TransferCharacteristics: opts.TransferCharacteristics,
+		MatrixCoefficients:      opts.MatrixCoefficients,
+		SharpYUV:                opts.SharpYUV,
+		TargetSize:              opts.TargetSize,
+		EXIFData:                opts.EXIFData,
+		XMPData:                 opts.XMPData,
+		ICCData:                 opts.ICCData,
+		IrotAngle:               opts.IrotAngle,
+		ImirAxis:                opts.ImirAxis,
+		Timescale:               opts.Timescale,
+		KeyframeInterval:        opts.KeyframeInterval,
+	}
+}
+
+// encodeAVIFWithLibrary encodes an image file to AVIF using the command API
+func encodeAVIFWithLibrary(inputPath string, opts AVIFEncodeOptions) ([]byte, error) {
+	// Convert options
+	avifencOpts := convertToAVIFEncOptions(opts)
+
+	// Create command
+	cmd, err := avifenc.NewCommand(&avifencOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create avifenc command: %w", err)
+	}
+	defer cmd.Close()
+
+	// Read input file
+	data, err := os.ReadFile(inputPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read input file: %w", err)
+	}
+
+	// Encode
+	avifData, err := cmd.Run(data)
+	if err != nil {
+		return nil, fmt.Errorf("encoding failed: %w", err)
+	}
+
+	return avifData, nil
+}

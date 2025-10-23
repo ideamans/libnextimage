@@ -9,6 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/ideamans/libnextimage/golang/cwebp"
+	"github.com/ideamans/libnextimage/golang/dwebp"
 )
 
 // テスト用のベースディレクトリ
@@ -77,13 +80,73 @@ func runCWebP(t *testing.T, inputFile string, args []string, outputFile string) 
 	return data
 }
 
-// ライブラリでWebPエンコード
+// WebPEncodeOptionsをcwebp.Optionsに変換
+func convertToCWebPOptions(opts WebPEncodeOptions) cwebp.Options {
+	return cwebp.Options{
+		Quality:          opts.Quality,
+		Lossless:         opts.Lossless,
+		Method:           opts.Method,
+		TargetSize:       opts.TargetSize,
+		TargetPSNR:       opts.TargetPSNR,
+		Segments:         opts.Segments,
+		SNSStrength:      opts.SNSStrength,
+		FilterStrength:   opts.FilterStrength,
+		FilterSharpness:  opts.FilterSharpness,
+		FilterType:       opts.FilterType,
+		Autofilter:       opts.Autofilter,
+		AlphaCompression: opts.AlphaMethod,
+		AlphaFiltering:   opts.AlphaFiltering,
+		AlphaQuality:     opts.AlphaQuality,
+		Pass:             opts.Pass,
+		ShowCompressed:   opts.ShowCompressed,
+		Preprocessing:    opts.Preprocessing,
+		Partitions:       opts.Partitions,
+		PartitionLimit:   opts.PartitionLimit,
+		EmulateJPEGSize:  opts.EmulateJPEGSize,
+		ThreadLevel:      boolToInt(opts.ThreadLevel),
+		LowMemory:        opts.LowMemory,
+		NearLossless:     opts.NearLossless,
+		Exact:            opts.Exact,
+		UseDeltaPalette:  opts.UseDeltaPalette,
+		UseSharpYUV:      opts.UseSharpYUV,
+		KeepMetadata:     opts.KeepMetadata,
+	}
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// ライブラリでWebPエンコード（コマンドAPIを使用）
 func encodeWithLibrary(t *testing.T, inputFile string, opts WebPEncodeOptions) []byte {
-	data, err := WebPEncodeFile(inputFile, opts)
+	t.Helper()
+
+	// WebPEncodeOptionsをcwebp.Optionsに変換
+	cwebpOpts := convertToCWebPOptions(opts)
+
+	// コマンドを作成
+	cmd, err := cwebp.NewCommand(&cwebpOpts)
+	if err != nil {
+		t.Fatalf("Failed to create cwebp command: %v", err)
+	}
+	defer cmd.Close()
+
+	// ファイルを読み込み
+	data, err := os.ReadFile(inputFile)
+	if err != nil {
+		t.Fatalf("Failed to read input file: %v", err)
+	}
+
+	// エンコード実行
+	webpData, err := cmd.Run(data)
 	if err != nil {
 		t.Fatalf("Library encode failed: %v", err)
 	}
-	return data
+
+	return webpData
 }
 
 // dwebpコマンドを実行してPNGデコード
@@ -159,24 +222,68 @@ func decodePNGToRGBA(filePath string) ([]byte, int, int, error) {
 	return rgba.Pix, width, height, nil
 }
 
-// ライブラリでWebPデコード（PNG出力）
+// WebPDecodeOptionsをdwebp.Optionsに変換
+func convertToDWebPOptions(opts WebPDecodeOptions) dwebp.Options {
+	return dwebp.Options{
+		OutputFormat:      dwebp.OutputFormat(opts.OutputFormat),
+		JPEGQuality:       opts.JPEGQuality,
+		Format:            formatToString(opts.Format),
+		BypassFiltering:   opts.BypassFiltering,
+		NoFancyUpsampling: opts.NoFancyUpsampling,
+		UseThreads:        opts.UseThreads,
+		CropX:             opts.CropX,
+		CropY:             opts.CropY,
+		CropWidth:         opts.CropWidth,
+		CropHeight:        opts.CropHeight,
+		UseCrop:           opts.UseCrop,
+		ResizeWidth:       opts.ResizeWidth,
+		ResizeHeight:      opts.ResizeHeight,
+		UseResize:         opts.UseResize,
+		Flip:              opts.Flip,
+	}
+}
+
+func formatToString(format PixelFormat) string {
+	switch format {
+	case FormatRGB:
+		return "RGB"
+	case FormatBGRA:
+		return "BGRA"
+	default:
+		return "RGBA"
+	}
+}
+
+// ライブラリでWebPデコード（PNG出力、コマンドAPIを使用）
 func decodeWithLibraryToFile(t *testing.T, webpFile string, pngFile string, opts WebPDecodeOptions) {
+	t.Helper()
+
 	// WebPファイルを読み込み
 	webpData, err := os.ReadFile(webpFile)
 	if err != nil {
 		t.Fatalf("Failed to read WebP file: %v", err)
 	}
 
-	// デコード
-	decoded, err := WebPDecodeBytes(webpData, opts)
+	// WebPDecodeOptionsをdwebp.Optionsに変換
+	dwebpOpts := convertToDWebPOptions(opts)
+
+	// コマンドを作成
+	cmd, err := dwebp.NewCommand(&dwebpOpts)
+	if err != nil {
+		t.Fatalf("Failed to create dwebp command: %v", err)
+	}
+	defer cmd.Close()
+
+	// デコード実行（PNG形式で出力）
+	pngData, err := cmd.Run(webpData)
 	if err != nil {
 		t.Fatalf("Library decode failed: %v", err)
 	}
 
-	// RGBAデータをPNGに変換
-	err = writePNGHelper(pngFile, decoded.Data, decoded.Width, decoded.Height, decoded.Format)
+	// PNGファイルに書き込み
+	err = os.WriteFile(pngFile, pngData, 0644)
 	if err != nil {
-		t.Fatalf("Failed to write PNG: %v", err)
+		t.Fatalf("Failed to write PNG file: %v", err)
 	}
 }
 

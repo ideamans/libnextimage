@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/ideamans/libnextimage/golang/cwebp"
 )
 
 // TestCompat_WebP_Preset tests the -preset option
@@ -789,18 +791,30 @@ func TestCompat_WebP_QMinQMax(t *testing.T) {
 	}
 }
 
-// Helper: ライブラリでWebPエンコード
+// Helper: ライブラリでWebPエンコード（コマンドAPIを使用）
 func webpEncodeWithLibrary(t *testing.T, inputPath string, opts WebPEncodeOptions) []byte {
 	t.Helper()
 
+	// WebPEncodeOptionsをcwebp.Optionsに変換
+	cwebpOpts := convertToCWebPOptions(opts)
+
+	// コマンドを作成
+	cmd, err := cwebp.NewCommand(&cwebpOpts)
+	if err != nil {
+		t.Fatalf("Failed to create cwebp command: %v", err)
+	}
+	defer cmd.Close()
+
+	// ファイルを読み込み
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
 		t.Fatalf("Failed to read input file: %v", err)
 	}
 
-	webpData, err := WebPEncodeBytes(data, opts)
+	// エンコード実行
+	webpData, err := cmd.Run(data)
 	if err != nil {
-		t.Fatalf("Library WebPEncodeBytes failed: %v", err)
+		t.Fatalf("Library encode failed: %v", err)
 	}
 
 	return webpData
