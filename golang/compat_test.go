@@ -86,16 +86,19 @@ func convertToCWebPOptions(opts WebPEncodeOptions) cwebp.Options {
 		Quality:          opts.Quality,
 		Lossless:         opts.Lossless,
 		Method:           opts.Method,
+		Preset:           int(opts.Preset),
+		ImageHint:        int(opts.ImageHint),
+		LosslessPreset:   opts.LosslessPreset,
 		TargetSize:       opts.TargetSize,
 		TargetPSNR:       opts.TargetPSNR,
 		Segments:         opts.Segments,
 		SNSStrength:      opts.SNSStrength,
 		FilterStrength:   opts.FilterStrength,
 		FilterSharpness:  opts.FilterSharpness,
-		FilterType:       opts.FilterType,
+		FilterType:       int(opts.FilterType),
 		Autofilter:       opts.Autofilter,
 		AlphaCompression: opts.AlphaMethod,
-		AlphaFiltering:   opts.AlphaFiltering,
+		AlphaFiltering:   int(opts.AlphaFiltering),
 		AlphaQuality:     opts.AlphaQuality,
 		Pass:             opts.Pass,
 		ShowCompressed:   opts.ShowCompressed,
@@ -109,6 +112,8 @@ func convertToCWebPOptions(opts WebPEncodeOptions) cwebp.Options {
 		Exact:            opts.Exact,
 		UseDeltaPalette:  opts.UseDeltaPalette,
 		UseSharpYUV:      opts.UseSharpYUV,
+		QMin:             opts.QMin,
+		QMax:             opts.QMax,
 		KeepMetadata:     opts.KeepMetadata,
 	}
 }
@@ -225,8 +230,6 @@ func decodePNGToRGBA(filePath string) ([]byte, int, int, error) {
 // WebPDecodeOptionsをdwebp.Optionsに変換
 func convertToDWebPOptions(opts WebPDecodeOptions) dwebp.Options {
 	return dwebp.Options{
-		OutputFormat:      dwebp.OutputFormat(opts.OutputFormat),
-		JPEGQuality:       opts.JPEGQuality,
 		Format:            formatToString(opts.Format),
 		BypassFiltering:   opts.BypassFiltering,
 		NoFancyUpsampling: opts.NoFancyUpsampling,

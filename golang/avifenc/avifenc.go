@@ -83,6 +83,19 @@ type Options struct {
 	IrotAngle int // Image rotation: 0-3 (90 * angle degrees anti-clockwise), -1=disabled
 	ImirAxis  int // Image mirror: 0=vertical, 1=horizontal, -1=disabled
 
+	// Pixel aspect ratio (pasp) - [h_spacing, v_spacing]
+	PASP [2]int // -1=disabled, otherwise [h_spacing, v_spacing]
+
+	// Crop rectangle - [x, y, width, height]
+	Crop [4]int // -1=disabled, otherwise [x, y, width, height]
+
+	// Clean aperture (clap) - [widthN, widthD, heightN, heightD, horizOffN, horizOffD, vertOffN, vertOffD]
+	CLAP [8]int // -1=disabled, otherwise [wN,wD, hN,hD, hOffN,hOffD, vOffN,vOffD]
+
+	// Content light level information (clli)
+	CLLIMaxCLL  int // Max content light level (0-65535), -1=disabled
+	CLLIMaxPALL int // Max picture average light level (0-65535), -1=disabled
+
 	// Animation settings (for future use)
 	Timescale        int // timescale/fps for animations (default: 30)
 	KeyframeInterval int // max keyframe interval (default: 0=disabled)
@@ -120,6 +133,11 @@ func NewDefaultOptions() Options {
 			TargetSize:              0,
 			IrotAngle:               -1,
 			ImirAxis:                -1,
+			PASP:                    [2]int{-1, -1},
+			Crop:                    [4]int{-1, -1, -1, -1},
+			CLAP:                    [8]int{-1, -1, -1, -1, -1, -1, -1, -1},
+			CLLIMaxCLL:              -1,
+			CLLIMaxPALL:             -1,
 			Timescale:               30,
 			KeyframeInterval:        0,
 		}
@@ -148,6 +166,11 @@ func NewDefaultOptions() Options {
 		TargetSize:              int(cOpts.target_size),
 		IrotAngle:               int(cOpts.irot_angle),
 		ImirAxis:                int(cOpts.imir_axis),
+		PASP:                    [2]int{int(cOpts.pasp[0]), int(cOpts.pasp[1])},
+		Crop:                    [4]int{int(cOpts.crop[0]), int(cOpts.crop[1]), int(cOpts.crop[2]), int(cOpts.crop[3])},
+		CLAP:                    [8]int{int(cOpts.clap[0]), int(cOpts.clap[1]), int(cOpts.clap[2]), int(cOpts.clap[3]), int(cOpts.clap[4]), int(cOpts.clap[5]), int(cOpts.clap[6]), int(cOpts.clap[7])},
+		CLLIMaxCLL:              int(cOpts.clli_max_cll),
+		CLLIMaxPALL:             int(cOpts.clli_max_pall),
 		Timescale:               int(cOpts.timescale),
 		KeyframeInterval:        int(cOpts.keyframe_interval),
 	}
@@ -219,6 +242,31 @@ func optionsToCOptions(opts Options) *C.AVIFEncOptions {
 
 	cOpts.irot_angle = C.int(opts.IrotAngle)
 	cOpts.imir_axis = C.int(opts.ImirAxis)
+
+	// Pixel aspect ratio (pasp)
+	cOpts.pasp[0] = C.int(opts.PASP[0])
+	cOpts.pasp[1] = C.int(opts.PASP[1])
+
+	// Crop rectangle
+	cOpts.crop[0] = C.int(opts.Crop[0])
+	cOpts.crop[1] = C.int(opts.Crop[1])
+	cOpts.crop[2] = C.int(opts.Crop[2])
+	cOpts.crop[3] = C.int(opts.Crop[3])
+
+	// Clean aperture (clap)
+	cOpts.clap[0] = C.int(opts.CLAP[0])
+	cOpts.clap[1] = C.int(opts.CLAP[1])
+	cOpts.clap[2] = C.int(opts.CLAP[2])
+	cOpts.clap[3] = C.int(opts.CLAP[3])
+	cOpts.clap[4] = C.int(opts.CLAP[4])
+	cOpts.clap[5] = C.int(opts.CLAP[5])
+	cOpts.clap[6] = C.int(opts.CLAP[6])
+	cOpts.clap[7] = C.int(opts.CLAP[7])
+
+	// Content light level information (clli)
+	cOpts.clli_max_cll = C.int(opts.CLLIMaxCLL)
+	cOpts.clli_max_pall = C.int(opts.CLLIMaxPALL)
+
 	cOpts.timescale = C.int(opts.Timescale)
 	cOpts.keyframe_interval = C.int(opts.KeyframeInterval)
 

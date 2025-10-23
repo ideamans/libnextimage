@@ -41,6 +41,24 @@ import (
 	"unsafe"
 )
 
+// Preset types (matches CWebPPreset)
+const (
+	PresetDefault = 0 // default preset
+	PresetPicture = 1 // digital picture, like portrait
+	PresetPhoto   = 2 // outdoor photograph
+	PresetDrawing = 3 // hand or line drawing
+	PresetIcon    = 4 // small-sized colorful images
+	PresetText    = 5 // text-like
+)
+
+// Image hint types (matches CWebPImageHint)
+const (
+	HintDefault = 0 // default hint
+	HintPicture = 1 // digital picture, like portrait
+	HintPhoto   = 2 // outdoor photograph
+	HintGraph   = 3 // discrete tone image (graph, map-tile)
+)
+
 // Metadata flags (can be combined with bitwise OR)
 const (
 	MetadataNone = 0 // No metadata
@@ -56,6 +74,9 @@ type Options struct {
 	Quality          float32
 	Lossless         bool
 	Method           int
+	Preset           int // Preset type: -1=none (default), or PresetDefault/PresetPicture/PresetPhoto/PresetDrawing/PresetIcon/PresetText
+	ImageHint        int // Image type hint: HintDefault/HintPicture/HintPhoto/HintGraph
+	LosslessPreset   int // Lossless preset: -1=don't use (default), 0-9=use preset (0=fast, 9=best)
 	TargetSize       int
 	TargetPSNR       float32
 	Segments         int
@@ -79,6 +100,8 @@ type Options struct {
 	Exact            bool
 	UseDeltaPalette  bool
 	UseSharpYUV      bool
+	QMin             int // Minimum permissible quality (0-100), default 0
+	QMax             int // Maximum permissible quality (0-100), default 100
 
 	// Metadata settings
 	KeepMetadata int // Bitwise OR of MetadataEXIF, MetadataICC, MetadataXMP (e.g., MetadataEXIF | MetadataXMP)
@@ -93,7 +116,7 @@ type Command struct {
 func NewDefaultOptions() Options {
 	cOpts := C.cwebp_create_default_options()
 	if cOpts == nil {
-		return Options{Quality: 75, Method: 4} // fallback defaults
+		return Options{Quality: 75, Method: 4, Preset: -1, LosslessPreset: -1, QMax: 100} // fallback defaults
 	}
 	defer C.cwebp_free_options(cOpts)
 
@@ -101,6 +124,9 @@ func NewDefaultOptions() Options {
 		Quality:          float32(cOpts.quality),
 		Lossless:         cOpts.lossless != 0,
 		Method:           int(cOpts.method),
+		Preset:           int(cOpts.preset),
+		ImageHint:        int(cOpts.image_hint),
+		LosslessPreset:   int(cOpts.lossless_preset),
 		TargetSize:       int(cOpts.target_size),
 		TargetPSNR:       float32(cOpts.target_psnr),
 		Segments:         int(cOpts.segments),
@@ -124,6 +150,8 @@ func NewDefaultOptions() Options {
 		Exact:            cOpts.exact != 0,
 		UseDeltaPalette:  cOpts.use_delta_palette != 0,
 		UseSharpYUV:      cOpts.use_sharp_yuv != 0,
+		QMin:             int(cOpts.qmin),
+		QMax:             int(cOpts.qmax),
 		KeepMetadata:     int(cOpts.keep_metadata),
 	}
 }
@@ -142,6 +170,9 @@ func optionsToCOptions(opts Options) *C.CWebPOptions {
 		cOpts.lossless = 0
 	}
 	cOpts.method = C.int(opts.Method)
+	cOpts.preset = C.CWebPPreset(opts.Preset)
+	cOpts.image_hint = C.CWebPImageHint(opts.ImageHint)
+	cOpts.lossless_preset = C.int(opts.LosslessPreset)
 	cOpts.target_size = C.int(opts.TargetSize)
 	cOpts.target_psnr = C.float(opts.TargetPSNR)
 	cOpts.segments = C.int(opts.Segments)
@@ -193,6 +224,8 @@ func optionsToCOptions(opts Options) *C.CWebPOptions {
 	} else {
 		cOpts.use_sharp_yuv = 0
 	}
+	cOpts.qmin = C.int(opts.QMin)
+	cOpts.qmax = C.int(opts.QMax)
 
 	// Metadata settings
 	cOpts.keep_metadata = C.int(opts.KeepMetadata)
