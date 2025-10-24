@@ -10,6 +10,7 @@ import {
   nextimage_avif_default_decode_options,
   nextimage_free_decode_buffer,
   nextimage_last_error_message,
+  nextimage_clear_error,
   NextImageDecodeBufferStruct,
   NextImageAVIFDecodeOptionsStruct
 } from './ffi';
@@ -21,6 +22,15 @@ import {
   isSuccess,
   normalizePixelFormat
 } from './types';
+
+/**
+ * FinalizationRegistry to automatically clean up decoder instances if they're garbage collected
+ */
+const decoderRegistry = new FinalizationRegistry((decoderPtr: any) => {
+  if (decoderPtr) {
+    nextimage_avif_decoder_destroy(decoderPtr);
+  }
+});
 
 /**
  * AVIF Decoder class
@@ -50,11 +60,15 @@ export class AVIFDecoder {
 
     if (!this.decoderPtr || koffi.address(this.decoderPtr) === 0n) {
       const errMsg = nextimage_last_error_message();
+      nextimage_clear_error(); // Clear error after reading
       throw new NextImageError(
         NextImageStatus.ERROR_OUT_OF_MEMORY,
         `Failed to create AVIF decoder: ${errMsg || 'unknown error'}`
       );
     }
+
+    // Register for automatic cleanup on garbage collection
+    decoderRegistry.register(this, this.decoderPtr, this);
   }
 
   /**
@@ -73,44 +87,47 @@ export class AVIFDecoder {
 
     const outputPtr = koffi.alloc(NextImageDecodeBufferStruct, 1);
 
-    const status = nextimage_avif_decoder_decode(
-      this.decoderPtr,
-      avifData,
-      avifData.length,
-      outputPtr
-    ) as NextImageStatus;
+    try {
+      const status = nextimage_avif_decoder_decode(
+        this.decoderPtr,
+        avifData,
+        avifData.length,
+        outputPtr
+      ) as NextImageStatus;
 
-    if (!isSuccess(status)) {
-      const errMsg = nextimage_last_error_message();
-      throw new NextImageError(status, `AVIF decode failed: ${errMsg || status}`);
+      if (!isSuccess(status)) {
+        const errMsg = nextimage_last_error_message();
+        nextimage_clear_error(); // Clear error after reading
+        throw new NextImageError(status, `AVIF decode failed: ${errMsg || status}`);
+      }
+
+      // Decode output struct
+      const output = koffi.decode(outputPtr, NextImageDecodeBufferStruct) as any;
+
+      if (!output.data || output.width === 0 || output.height === 0) {
+        throw new NextImageError(NextImageStatus.ERROR_DECODE_FAILED, 'Decoding produced invalid output');
+      }
+
+      // Copy data from C memory to JavaScript Buffer
+      const dataSize = Number(output.data_size) || (Number(output.stride) * Number(output.height));
+      const rawData = koffi.decode(output.data, koffi.array('uint8_t', dataSize));
+      const copiedData = Buffer.from(rawData as any);
+
+      // Create result object
+      const result: DecodedImage = {
+        data: copiedData,
+        width: Number(output.width),
+        height: Number(output.height),
+        stride: Number(output.stride),
+        format: Number(output.format),
+        bitDepth: Number(output.bit_depth)
+      };
+
+      return result;
+    } finally {
+      // Always free C-allocated memory, even on error
+      nextimage_free_decode_buffer(outputPtr);
     }
-
-    // Decode output struct
-    const output = koffi.decode(outputPtr, NextImageDecodeBufferStruct) as any;
-
-    if (!output.data || output.width === 0 || output.height === 0) {
-      throw new NextImageError(NextImageStatus.ERROR_DECODE_FAILED, 'Decoding produced invalid output');
-    }
-
-    // Copy data from C memory to JavaScript Buffer
-    const dataSize = Number(output.data_size) || (Number(output.stride) * Number(output.height));
-    const rawData = koffi.decode(output.data, koffi.array('uint8_t', dataSize));
-    const copiedData = Buffer.from(rawData as any);
-
-    // Create result object
-    const result: DecodedImage = {
-      data: copiedData,
-      width: Number(output.width),
-      height: Number(output.height),
-      stride: Number(output.stride),
-      format: Number(output.format),
-      bitDepth: Number(output.bit_depth)
-    };
-
-    // Free C-allocated memory
-    nextimage_free_decode_buffer(outputPtr);
-
-    return result;
   }
 
   /**
@@ -119,7 +136,10 @@ export class AVIFDecoder {
    */
   close(): void {
     if (!this.closed && this.decoderPtr) {
+      // Unregister from finalization registry to avoid double-free
+      decoderRegistry.unregister(this);
       nextimage_avif_decoder_destroy(this.decoderPtr);
+      this.decoderPtr = null; // Clear pointer to prevent reuse
       this.closed = true;
     }
   }

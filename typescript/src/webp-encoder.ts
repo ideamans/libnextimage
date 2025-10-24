@@ -10,6 +10,7 @@ import {
   nextimage_webp_default_encode_options,
   nextimage_free_buffer,
   nextimage_last_error_message,
+  nextimage_clear_error,
   NextImageBufferStruct,
   NextImageWebPEncodeOptionsStruct
 } from './ffi';
@@ -19,6 +20,15 @@ import {
   NextImageError,
   isSuccess
 } from './types';
+
+/**
+ * FinalizationRegistry to automatically clean up encoder instances if they're garbage collected
+ */
+const encoderRegistry = new FinalizationRegistry((encoderPtr: any) => {
+  if (encoderPtr) {
+    nextimage_webp_encoder_destroy(encoderPtr);
+  }
+});
 
 /**
  * WebP Encoder class
@@ -48,11 +58,15 @@ export class WebPEncoder {
 
     if (!this.encoderPtr || koffi.address(this.encoderPtr) === 0n) {
       const errMsg = nextimage_last_error_message();
+      nextimage_clear_error(); // Clear error after reading
       throw new NextImageError(
         NextImageStatus.ERROR_OUT_OF_MEMORY,
         `Failed to create WebP encoder: ${errMsg || 'unknown error'}`
       );
     }
+
+    // Register for automatic cleanup on garbage collection
+    encoderRegistry.register(this, this.encoderPtr, this);
   }
 
   /**
@@ -71,34 +85,37 @@ export class WebPEncoder {
 
     const outputPtr = koffi.alloc(NextImageBufferStruct, 1);
 
-    const status = nextimage_webp_encoder_encode(
-      this.encoderPtr,
-      imageFileData,
-      imageFileData.length,
-      outputPtr
-    ) as NextImageStatus;
+    try {
+      const status = nextimage_webp_encoder_encode(
+        this.encoderPtr,
+        imageFileData,
+        imageFileData.length,
+        outputPtr
+      ) as NextImageStatus;
 
-    if (!isSuccess(status)) {
-      const errMsg = nextimage_last_error_message();
-      throw new NextImageError(status, `WebP encode failed: ${errMsg || status}`);
+      if (!isSuccess(status)) {
+        const errMsg = nextimage_last_error_message();
+        nextimage_clear_error(); // Clear error after reading
+        throw new NextImageError(status, `WebP encode failed: ${errMsg || status}`);
+      }
+
+      // Decode output struct
+      const output = koffi.decode(outputPtr, NextImageBufferStruct) as any;
+
+      if (!output.data || output.size === 0) {
+        throw new NextImageError(NextImageStatus.ERROR_ENCODE_FAILED, 'Encoding produced empty output');
+      }
+
+      // Copy data from C memory to JavaScript Buffer
+      const dataSize = Number(output.size);
+      const rawData = koffi.decode(output.data, koffi.array('uint8_t', dataSize));
+      const result = Buffer.from(rawData as any);
+
+      return result;
+    } finally {
+      // Always free C-allocated memory, even on error
+      nextimage_free_buffer(outputPtr);
     }
-
-    // Decode output struct
-    const output = koffi.decode(outputPtr, NextImageBufferStruct) as any;
-
-    if (!output.data || output.size === 0) {
-      throw new NextImageError(NextImageStatus.ERROR_ENCODE_FAILED, 'Encoding produced empty output');
-    }
-
-    // Copy data from C memory to JavaScript Buffer
-    const dataSize = Number(output.size);
-    const rawData = koffi.decode(output.data, koffi.array('uint8_t', dataSize));
-    const result = Buffer.from(rawData as any);
-
-    // Free C-allocated memory
-    nextimage_free_buffer(outputPtr);
-
-    return result;
   }
 
   /**
@@ -107,7 +124,10 @@ export class WebPEncoder {
    */
   close(): void {
     if (!this.closed && this.encoderPtr) {
+      // Unregister from finalization registry to avoid double-free
+      encoderRegistry.unregister(this);
       nextimage_webp_encoder_destroy(this.encoderPtr);
+      this.encoderPtr = null; // Clear pointer to prevent reuse
       this.closed = true;
     }
   }
