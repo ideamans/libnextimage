@@ -493,3 +493,164 @@ func AVIFDecodeSize(avifData []byte) (width, height, bitDepth int, requiredSize 
 
 	return int(w), int(h), int(depth), int(size), nil
 }
+
+// ========================================
+// AVIF Encoder/Decoder (Instance-based API)
+// ========================================
+
+// AVIFEncoder represents an AVIF encoder instance that can be reused for multiple images
+type AVIFEncoder struct {
+	encoderPtr *C.NextImageAVIFEncoder
+}
+
+// NewAVIFEncoder creates a new AVIF encoder with the given options
+// Options can be customized using the provided callback function
+//
+// Example:
+//
+//	encoder, err := NewAVIFEncoder(func(opts *AVIFEncodeOptions) {
+//	    opts.Quality = 60
+//	    opts.Speed = 6
+//	    opts.BitDepth = 10
+//	})
+func NewAVIFEncoder(optsFn func(*AVIFEncodeOptions)) (*AVIFEncoder, error) {
+	clearError()
+
+	// Get default options
+	opts := DefaultAVIFEncodeOptions()
+
+	// Apply user customizations
+	if optsFn != nil {
+		optsFn(&opts)
+	}
+
+	// Convert to C struct
+	cOpts := opts.toCEncodeOptions()
+
+	// Create encoder
+	encoderPtr := C.nextimage_avif_encoder_create(&cOpts)
+	if encoderPtr == nil {
+		return nil, fmt.Errorf("avif encoder: failed to create encoder: %s", getLastError())
+	}
+
+	return &AVIFEncoder{encoderPtr: encoderPtr}, nil
+}
+
+// Encode encodes image file data (JPEG, PNG, etc.) to AVIF format
+// The encoder instance can be reused for multiple images, reducing initialization overhead
+func (e *AVIFEncoder) Encode(imageFileData []byte) ([]byte, error) {
+	if e.encoderPtr == nil {
+		return nil, fmt.Errorf("avif encoder: encoder is closed")
+	}
+
+	if len(imageFileData) == 0 {
+		return nil, fmt.Errorf("avif encoder: empty input data")
+	}
+
+	var encoded C.NextImageBuffer
+	status := C.nextimage_avif_encoder_encode(
+		e.encoderPtr,
+		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
+		C.size_t(len(imageFileData)),
+		&encoded,
+	)
+
+	if status != C.NEXTIMAGE_OK {
+		return nil, makeError(status, "avif encoder encode")
+	}
+
+	// Copy data to Go slice
+	result := C.GoBytes(unsafe.Pointer(encoded.data), C.int(encoded.size))
+
+	// Free C buffer
+	freeEncodeBuffer(&encoded)
+
+	return result, nil
+}
+
+// Close releases resources associated with the encoder
+// Must be called when done using the encoder
+func (e *AVIFEncoder) Close() {
+	if e.encoderPtr != nil {
+		C.nextimage_avif_encoder_destroy(e.encoderPtr)
+		e.encoderPtr = nil
+	}
+}
+
+// AVIFDecoder represents an AVIF decoder instance that can be reused for multiple images
+type AVIFDecoder struct {
+	decoderPtr *C.NextImageAVIFDecoder
+}
+
+// NewAVIFDecoder creates a new AVIF decoder with the given options
+// Options can be customized using the provided callback function
+//
+// Example:
+//
+//	decoder, err := NewAVIFDecoder(func(opts *AVIFDecodeOptions) {
+//	    opts.Format = PixelFormatRGBA
+//	    opts.Jobs = -1  // use all cores
+//	})
+func NewAVIFDecoder(optsFn func(*AVIFDecodeOptions)) (*AVIFDecoder, error) {
+	clearError()
+
+	// Get default options
+	opts := DefaultAVIFDecodeOptions()
+
+	// Apply user customizations
+	if optsFn != nil {
+		optsFn(&opts)
+	}
+
+	// Convert to C struct
+	cOpts := opts.toCDecodeOptions()
+
+	// Create decoder
+	decoderPtr := C.nextimage_avif_decoder_create(&cOpts)
+	if decoderPtr == nil {
+		return nil, fmt.Errorf("avif decoder: failed to create decoder: %s", getLastError())
+	}
+
+	return &AVIFDecoder{decoderPtr: decoderPtr}, nil
+}
+
+// Decode decodes AVIF data to pixel data
+// The decoder instance can be reused for multiple images, reducing initialization overhead
+func (d *AVIFDecoder) Decode(avifData []byte) (*DecodedImage, error) {
+	if d.decoderPtr == nil {
+		return nil, fmt.Errorf("avif decoder: decoder is closed")
+	}
+
+	if len(avifData) == 0 {
+		return nil, fmt.Errorf("avif decoder: empty input data")
+	}
+
+	var decoded C.NextImageDecodeBuffer
+	status := C.nextimage_avif_decoder_decode(
+		d.decoderPtr,
+		(*C.uint8_t)(unsafe.Pointer(&avifData[0])),
+		C.size_t(len(avifData)),
+		&decoded,
+	)
+
+	if status != C.NEXTIMAGE_OK {
+		return nil, makeError(status, "avif decoder decode")
+	}
+
+	// Convert to Go structure
+	img := convertDecodeBuffer(&decoded)
+
+	// Free C buffer
+	freeDecodeBuffer(&decoded)
+
+	return img, nil
+}
+
+// Close releases resources associated with the decoder
+// Must be called when done using the decoder
+func (d *AVIFDecoder) Close() {
+	if d.decoderPtr != nil {
+		C.nextimage_avif_decoder_destroy(d.decoderPtr)
+		d.decoderPtr = nil
+	}
+}

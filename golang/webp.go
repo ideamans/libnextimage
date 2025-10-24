@@ -698,3 +698,171 @@ func WebP2GIF(webpData []byte) ([]byte, error) {
 
 	return result, nil
 }
+
+// ========================================
+// WebP Encoder/Decoder (Instance-based API)
+// ========================================
+
+// WebPEncoder represents a WebP encoder instance that can be reused for multiple images
+type WebPEncoder struct {
+	encoderPtr *C.NextImageWebPEncoder
+}
+
+// NewWebPEncoder creates a new WebP encoder with the given options
+// Options can be customized using the provided callback function
+//
+// Example:
+//
+//	encoder, err := NewWebPEncoder(func(opts *WebPEncodeOptions) {
+//	    opts.Quality = 80
+//	    opts.Method = 6
+//	})
+func NewWebPEncoder(optsFn func(*WebPEncodeOptions)) (*WebPEncoder, error) {
+	clearError()
+
+	// Get default options
+	var cOpts C.NextImageWebPEncodeOptions
+	C.nextimage_webp_default_encode_options(&cOpts)
+
+	// Convert to Go struct
+	opts := DefaultWebPEncodeOptions()
+
+	// Apply user customizations
+	if optsFn != nil {
+		optsFn(&opts)
+	}
+
+	// Convert back to C struct
+	cOpts = convertEncodeOptions(opts)
+
+	// Create encoder
+	encoderPtr := C.nextimage_webp_encoder_create(&cOpts)
+	if encoderPtr == nil {
+		return nil, fmt.Errorf("webp encoder: failed to create encoder: %s", getLastError())
+	}
+
+	return &WebPEncoder{encoderPtr: encoderPtr}, nil
+}
+
+// Encode encodes image file data (JPEG, PNG, etc.) to WebP format
+// The encoder instance can be reused for multiple images, reducing initialization overhead
+func (e *WebPEncoder) Encode(imageFileData []byte) ([]byte, error) {
+	if e.encoderPtr == nil {
+		return nil, fmt.Errorf("webp encoder: encoder is closed")
+	}
+
+	if len(imageFileData) == 0 {
+		return nil, fmt.Errorf("webp encoder: empty input data")
+	}
+
+	var encoded C.NextImageBuffer
+	status := C.nextimage_webp_encoder_encode(
+		e.encoderPtr,
+		(*C.uint8_t)(unsafe.Pointer(&imageFileData[0])),
+		C.size_t(len(imageFileData)),
+		&encoded,
+	)
+
+	if status != C.NEXTIMAGE_OK {
+		return nil, makeError(status, "webp encoder encode")
+	}
+
+	// Copy data to Go slice
+	result := C.GoBytes(unsafe.Pointer(encoded.data), C.int(encoded.size))
+
+	// Free C buffer
+	freeEncodeBuffer(&encoded)
+
+	return result, nil
+}
+
+// Close releases resources associated with the encoder
+// Must be called when done using the encoder
+func (e *WebPEncoder) Close() {
+	if e.encoderPtr != nil {
+		C.nextimage_webp_encoder_destroy(e.encoderPtr)
+		e.encoderPtr = nil
+	}
+}
+
+// WebPDecoder represents a WebP decoder instance that can be reused for multiple images
+type WebPDecoder struct {
+	decoderPtr *C.NextImageWebPDecoder
+}
+
+// NewWebPDecoder creates a new WebP decoder with the given options
+// Options can be customized using the provided callback function
+//
+// Example:
+//
+//	decoder, err := NewWebPDecoder(func(opts *WebPDecodeOptions) {
+//	    opts.Format = PixelFormatRGBA
+//	    opts.UseThreads = true
+//	})
+func NewWebPDecoder(optsFn func(*WebPDecodeOptions)) (*WebPDecoder, error) {
+	clearError()
+
+	// Get default options
+	var cOpts C.NextImageWebPDecodeOptions
+	C.nextimage_webp_default_decode_options(&cOpts)
+
+	// Convert to Go struct
+	opts := DefaultWebPDecodeOptions()
+
+	// Apply user customizations
+	if optsFn != nil {
+		optsFn(&opts)
+	}
+
+	// Convert back to C struct
+	cOpts = convertDecodeOptions(opts)
+
+	// Create decoder
+	decoderPtr := C.nextimage_webp_decoder_create(&cOpts)
+	if decoderPtr == nil {
+		return nil, fmt.Errorf("webp decoder: failed to create decoder: %s", getLastError())
+	}
+
+	return &WebPDecoder{decoderPtr: decoderPtr}, nil
+}
+
+// Decode decodes WebP data to pixel data
+// The decoder instance can be reused for multiple images, reducing initialization overhead
+func (d *WebPDecoder) Decode(webpData []byte) (*DecodedImage, error) {
+	if d.decoderPtr == nil {
+		return nil, fmt.Errorf("webp decoder: decoder is closed")
+	}
+
+	if len(webpData) == 0 {
+		return nil, fmt.Errorf("webp decoder: empty input data")
+	}
+
+	var decoded C.NextImageDecodeBuffer
+	status := C.nextimage_webp_decoder_decode(
+		d.decoderPtr,
+		(*C.uint8_t)(unsafe.Pointer(&webpData[0])),
+		C.size_t(len(webpData)),
+		&decoded,
+	)
+
+	if status != C.NEXTIMAGE_OK {
+		return nil, makeError(status, "webp decoder decode")
+	}
+
+	// Convert to Go structure
+	img := convertDecodeBuffer(&decoded)
+
+	// Free C buffer
+	freeDecodeBuffer(&decoded)
+
+	return img, nil
+}
+
+// Close releases resources associated with the decoder
+// Must be called when done using the decoder
+func (d *WebPDecoder) Close() {
+	if d.decoderPtr != nil {
+		C.nextimage_webp_decoder_destroy(d.decoderPtr)
+		d.decoderPtr = nil
+	}
+}
