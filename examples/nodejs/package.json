@@ -1,0 +1,20 @@
+{
+  "name": "libnextimage-nodejs-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end test for @ideamans/libnextimage on Node.js",
+  "type": "module",
+  "scripts": {
+    "test:basic": "node scripts/basic-encode.js",
+    "test:batch": "node scripts/batch-process.js",
+    "test:decode": "node scripts/decode-test.js",
+    "test:all": "node scripts/all-features.js",
+    "test": "npm run test:basic && npm run test:batch && npm run test:decode && npm run test:all"
+  },
+  "dependencies": {
+    "@ideamans/libnextimage": "file:../ideamans-libnextimage-0.4.0.tgz"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

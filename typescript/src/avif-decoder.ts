@@ -18,7 +18,8 @@ import {
   DecodedImage,
   NextImageStatus,
   NextImageError,
-  isSuccess
+  isSuccess,
+  normalizePixelFormat
 } from './types';
 
 /**
@@ -154,7 +155,7 @@ export class AVIFDecoder {
       cOpts.use_threads = opts.useThreads ? 1 : 0;
     }
     if (opts.format !== undefined) {
-      cOpts.format = opts.format;
+      cOpts.format = normalizePixelFormat(opts.format);
     }
     if (opts.ignoreExif !== undefined) {
       cOpts.ignore_exif = opts.ignoreExif ? 1 : 0;

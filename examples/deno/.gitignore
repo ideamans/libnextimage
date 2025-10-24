@@ -1,0 +1,4 @@
+output/*.webp
+output/*.avif
+output/*.jpg
+output/*.png

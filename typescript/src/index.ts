@@ -8,6 +8,7 @@ export * from './types';
 
 // Export library utilities
 export {
+  getLibraryVersion,
   getPlatform,
   getLibraryFileName,
   getLibraryPath,

@@ -18,7 +18,8 @@ import {
   DecodedImage,
   NextImageStatus,
   NextImageError,
-  isSuccess
+  isSuccess,
+  normalizePixelFormat
 } from './types';
 
 /**
@@ -151,7 +152,7 @@ export class WebPDecoder {
       cOpts.use_threads = opts.useThreads ? 1 : 0;
     }
     if (opts.format !== undefined) {
-      cOpts.format = opts.format;
+      cOpts.format = normalizePixelFormat(opts.format);
     }
 
     // Encode back to pointer

@@ -29,6 +29,31 @@ export enum PixelFormat {
 }
 
 /**
+ * Convert PixelFormat string or number to number
+ */
+export function normalizePixelFormat(format: PixelFormat | string | number | undefined): number {
+  if (format === undefined) {
+    return PixelFormat.RGBA;
+  }
+  if (typeof format === 'number') {
+    return format;
+  }
+  if (typeof format === 'string') {
+    const upperFormat = format.toUpperCase();
+    switch (upperFormat) {
+      case 'RGBA': return PixelFormat.RGBA;
+      case 'RGB': return PixelFormat.RGB;
+      case 'BGRA': return PixelFormat.BGRA;
+      case 'YUV420': return PixelFormat.YUV420;
+      case 'YUV422': return PixelFormat.YUV422;
+      case 'YUV444': return PixelFormat.YUV444;
+      default: throw new Error(`Unknown pixel format: ${format}`);
+    }
+  }
+  return format as number;
+}
+
+/**
  * WebP Preset types
  */
 export enum WebPPreset {
