@@ -44,7 +44,6 @@
   },
   "files": [
     "dist",
-    "lib",
     "scripts",
     "library-version.json",
     "README.md",

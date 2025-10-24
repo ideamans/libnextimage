@@ -1,0 +1,36 @@
+# Development files
+src/
+test/
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Test files in dist
+dist/test/
+
+# Build artifacts
+node_modules/
+
+# Local library builds (will be downloaded by postinstall)
+lib/**/*.dylib
+lib/**/*.so
+lib/**/*.dll
+lib/**/*.a
+
+# Keep .gitkeep files to maintain directory structure
+!lib/**/.gitkeep
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github/
+
+# IDE
+.vscode/
+.idea/
+
+# Bun and Deno examples
+bun/
+deno/
