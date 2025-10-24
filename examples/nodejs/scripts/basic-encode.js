@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { WebPEncoder, AVIFEncoder, getLibraryVersion } from '@ideamans/libnextimage'
+import { WebPEncoder, AVIFEncoder, getLibraryVersion } from 'libnextimage'
 
 console.log('=== libnextimage Node.js E2E Test: Basic Encode ===\n')
 console.log(`Library version: ${getLibraryVersion()}\n`)

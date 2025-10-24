@@ -1,5 +1,5 @@
 {
-  "name": "@ideamans/libnextimage",
+  "name": "libnextimage",
   "version": "0.4.0",
   "description": "TypeScript/Node.js bindings for libnextimage - high-performance WebP and AVIF image processing",
   "main": "dist/index.js",

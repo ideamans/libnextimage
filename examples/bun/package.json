@@ -2,16 +2,16 @@
   "name": "libnextimage-bun-e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "End-to-end test for @ideamans/libnextimage on Bun",
+  "description": "End-to-end test for libnextimage on Bun",
   "type": "module",
   "scripts": {
     "test:basic": "bun run scripts/basic-encode.ts"
   },
   "dependencies": {
-    "@ideamans/libnextimage": "file:../../typescript"
+    "libnextimage": "file:../../typescript"
   },
   "trustedDependencies": [
-    "@ideamans/libnextimage",
+    "libnextimage",
     "koffi"
   ]
 }

@@ -1,4 +1,4 @@
-# @ideamans/libnextimage
+# libnextimage
 
 Node.js向けの高性能WebP・AVIF画像処理ライブラリ、TypeScriptサポート付き。
 
@@ -16,7 +16,7 @@ Node.js向けの高性能WebP・AVIF画像処理ライブラリ、TypeScriptサ�
 ## インストール
 
 ```bash
-npm install @ideamans/libnextimage
+npm install libnextimage
 ```
 
 インストール時にお使いのプラットフォームに適したプリビルドネイティブライブラリが自動的にダウンロードされます。コンパイル不要！
@@ -32,7 +32,7 @@ npm install @ideamans/libnextimage
 ### WebPエンコード
 
 ```typescript
-import { WebPEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 // オプションを指定してエンコーダーを作成
@@ -55,7 +55,7 @@ console.log(`変換完了: ${jpegData.length} バイト → ${webpData.length} �
 ### AVIFエンコード
 
 ```typescript
-import { AVIFEncoder } from '@ideamans/libnextimage'
+import { AVIFEncoder } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 // オプションを指定してエンコーダーを作成
@@ -78,7 +78,7 @@ console.log(`変換完了: ${jpegData.length} バイト → ${avifData.length} �
 ### WebPデコード
 
 ```typescript
-import { WebPDecoder } from '@ideamans/libnextimage'
+import { WebPDecoder } from 'libnextimage'
 import { readFileSync } from 'fs'
 
 const decoder = new WebPDecoder({
@@ -96,7 +96,7 @@ decoder.close()
 ### AVIFデコード
 
 ```typescript
-import { AVIFDecoder } from '@ideamans/libnextimage'
+import { AVIFDecoder } from 'libnextimage'
 import { readFileSync } from 'fs'
 
 const decoder = new AVIFDecoder({
@@ -114,7 +114,7 @@ decoder.close()
 ### GIFからWebPへの変換
 
 ```typescript
-import { GIF2WebPConverter } from '@ideamans/libnextimage'
+import { GIF2WebPConverter } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 const converter = new GIF2WebPConverter({
@@ -135,7 +135,7 @@ console.log(`GIF: ${gifData.length} バイト → WebP: ${webpData.length} バ�
 ### WebPからGIFへの変換
 
 ```typescript
-import { WebP2GIFConverter } from '@ideamans/libnextimage'
+import { WebP2GIFConverter } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 const converter = new WebP2GIFConverter()
@@ -362,7 +362,7 @@ class GIF2WebPConverter {
 #### 例: アニメーションGIF変換
 
 ```typescript
-import { GIF2WebPConverter } from '@ideamans/libnextimage'
+import { GIF2WebPConverter } from 'libnextimage'
 
 const converter = new GIF2WebPConverter({
   quality: 80,
@@ -406,7 +406,7 @@ class WebP2GIFConverter {
 #### 例: WebPからGIFへ
 
 ```typescript
-import { WebP2GIFConverter } from '@ideamans/libnextimage'
+import { WebP2GIFConverter } from 'libnextimage'
 
 const converter = new WebP2GIFConverter()
 
@@ -420,7 +420,7 @@ converter.close()
 ## バッチ処理の例
 
 ```typescript
-import { WebPEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder } from 'libnextimage'
 import { readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
@@ -482,7 +482,7 @@ const result = encoder.encode(data)
 これにより、ネイティブライブラリを再ビルドすることなく、TypeScriptコードのパッチリリースが可能になります。
 
 ```typescript
-import { getLibraryVersion } from '@ideamans/libnextimage'
+import { getLibraryVersion } from 'libnextimage'
 
 console.log(getLibraryVersion()) // 例: "0.4.0"
 ```
@@ -495,7 +495,7 @@ console.log(getLibraryVersion()) // 例: "0.4.0"
 
 **解決方法:**
 ```bash
-npm install --force @ideamans/libnextimage
+npm install --force libnextimage
 ```
 
 ### "Unsupported platform"

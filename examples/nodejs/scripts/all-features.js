@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { WebPEncoder, AVIFEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder, AVIFEncoder } from 'libnextimage'
 
 console.log('=== libnextimage Node.js E2E Test: All Features ===\n')
 

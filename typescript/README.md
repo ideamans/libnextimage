@@ -1,4 +1,4 @@
-# @ideamans/libnextimage
+# libnextimage
 
 High-performance WebP and AVIF image processing library for Node.js, with TypeScript support.
 
@@ -16,7 +16,7 @@ High-performance WebP and AVIF image processing library for Node.js, with TypeSc
 ## Installation
 
 ```bash
-npm install @ideamans/libnextimage
+npm install libnextimage
 ```
 
 The package automatically downloads the appropriate pre-built native library for your platform during installation. No compilation required!
@@ -32,7 +32,7 @@ The package automatically downloads the appropriate pre-built native library for
 ### WebP Encoding
 
 ```typescript
-import { WebPEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 // Create encoder with options
@@ -55,7 +55,7 @@ console.log(`Converted: ${jpegData.length} bytes → ${webpData.length} bytes`)
 ### AVIF Encoding
 
 ```typescript
-import { AVIFEncoder } from '@ideamans/libnextimage'
+import { AVIFEncoder } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 // Create encoder with options
@@ -78,7 +78,7 @@ console.log(`Converted: ${jpegData.length} bytes → ${avifData.length} bytes`)
 ### WebP Decoding
 
 ```typescript
-import { WebPDecoder } from '@ideamans/libnextimage'
+import { WebPDecoder } from 'libnextimage'
 import { readFileSync } from 'fs'
 
 const decoder = new WebPDecoder({
@@ -96,7 +96,7 @@ decoder.close()
 ### AVIF Decoding
 
 ```typescript
-import { AVIFDecoder } from '@ideamans/libnextimage'
+import { AVIFDecoder } from 'libnextimage'
 import { readFileSync } from 'fs'
 
 const decoder = new AVIFDecoder({
@@ -114,7 +114,7 @@ decoder.close()
 ### GIF to WebP Conversion
 
 ```typescript
-import { GIF2WebPConverter } from '@ideamans/libnextimage'
+import { GIF2WebPConverter } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 const converter = new GIF2WebPConverter({
@@ -135,7 +135,7 @@ console.log(`GIF: ${gifData.length} bytes → WebP: ${webpData.length} bytes`)
 ### WebP to GIF Conversion
 
 ```typescript
-import { WebP2GIFConverter } from '@ideamans/libnextimage'
+import { WebP2GIFConverter } from 'libnextimage'
 import { readFileSync, writeFileSync } from 'fs'
 
 const converter = new WebP2GIFConverter()
@@ -354,7 +354,7 @@ class GIF2WebPConverter {
 #### Example: Animated GIF Conversion
 
 ```typescript
-import { GIF2WebPConverter } from '@ideamans/libnextimage'
+import { GIF2WebPConverter } from 'libnextimage'
 
 const converter = new GIF2WebPConverter({
   quality: 80,
@@ -398,7 +398,7 @@ class WebP2GIFConverter {
 #### Example: WebP to GIF
 
 ```typescript
-import { WebP2GIFConverter } from '@ideamans/libnextimage'
+import { WebP2GIFConverter } from 'libnextimage'
 
 const converter = new WebP2GIFConverter()
 
@@ -412,7 +412,7 @@ converter.close()
 ## Batch Processing Example
 
 ```typescript
-import { WebPEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder } from 'libnextimage'
 import { readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
@@ -474,7 +474,7 @@ This package uses a dual-version system:
 This allows patch releases for TypeScript code without rebuilding native libraries.
 
 ```typescript
-import { getLibraryVersion } from '@ideamans/libnextimage'
+import { getLibraryVersion } from 'libnextimage'
 
 console.log(getLibraryVersion()) // e.g., "0.4.0"
 ```
@@ -487,7 +487,7 @@ The native library wasn't downloaded during installation.
 
 **Solution:**
 ```bash
-npm install --force @ideamans/libnextimage
+npm install --force libnextimage
 ```
 
 ### "Unsupported platform"

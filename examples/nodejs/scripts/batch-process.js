@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { WebPEncoder } from '@ideamans/libnextimage'
+import { WebPEncoder } from 'libnextimage'
 
 console.log('=== libnextimage Node.js E2E Test: Batch Processing ===\n')
 
