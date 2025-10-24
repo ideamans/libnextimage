@@ -8,8 +8,8 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  test-go:
-    name: Go Tests (${{ matrix.os }})
+  build-c-library:
+    name: Build C Library (${{ matrix.os }})
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -22,11 +22,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
@@ -56,10 +51,49 @@ jobs:
             mingw-w64-ucrt-x86_64-nasm
             mingw-w64-ucrt-x86_64-imagemagick
 
-      - name: Build C library (Unix/MSYS2)
+      - name: Build C library (Unix)
         if: runner.os != 'Windows'
         run: |
           bash scripts/build-c-library.sh
+
+      - name: Build C library (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          bash scripts/build-c-library.sh
+
+      - name: Run C tests (Unix)
+        if: runner.os != 'Windows'
+        working-directory: c/build
+        run: |
+          ctest --output-on-failure --verbose
+
+      - name: Run C tests (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        working-directory: c/build
+        run: |
+          ctest --output-on-failure --verbose
+
+      - name: Generate test images (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          bash scripts/generate-test-images.sh
+
+      - name: Generate test images (Windows - MSYS2)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          bash scripts/generate-test-images.sh
+
+      - name: Cache C library artifacts
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            lib/
+            c/build/
+            testdata/
+          key: c-library-${{ runner.os }}-${{ github.sha }}
 
       - name: Dump build logs (on failure - Unix)
         if: failure() && runner.os != 'Windows'
@@ -83,22 +117,6 @@ jobs:
           echo ""
           echo "=== Library Installation Directory ==="
           ls -la lib/*/ || echo "Library directory not found"
-          echo ""
-          echo "=== Check if giflib was found ==="
-          grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
-          echo ""
-          echo "=== libnextimage.a contents ==="
-          if [ -f "lib/static/libnextimage.a" ]; then
-            ar -t lib/static/libnextimage.a | head -50
-          else
-            echo "libnextimage.a not found"
-          fi
-
-      - name: Build C library (Windows - MSYS2)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          bash scripts/build-c-library.sh
 
       - name: Dump build logs (on failure - Windows)
         if: failure() && runner.os == 'Windows'
@@ -123,27 +141,50 @@ jobs:
           echo ""
           echo "=== Library Installation Directory ==="
           ls -la lib/*/ || echo "Library directory not found"
-          echo ""
-          echo "=== Check if giflib was found ==="
-          grep -i "gif" c/build/CMakeCache.txt || echo "No gif references in CMakeCache.txt"
-          echo ""
-          echo "=== libnextimage.a contents ==="
-          if [ -f "lib/static/libnextimage.a" ]; then
-            ar -t lib/static/libnextimage.a | head -50
-          else
-            echo "libnextimage.a not found"
-          fi
 
-      - name: Generate test images (Unix/MSYS2)
-        if: runner.os != 'Windows'
-        run: |
-          bash scripts/generate-test-images.sh
+  test-go:
+    name: Go Tests (${{ matrix.os }})
+    needs: build-c-library
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
-      - name: Generate test images (Windows - MSYS2)
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Restore C library cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            lib/
+            c/build/
+            testdata/
+          key: c-library-${{ runner.os }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Setup MSYS2 (Windows)
         if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          bash scripts/generate-test-images.sh
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libjpeg-turbo
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-giflib
+            mingw-w64-ucrt-x86_64-libwebp
 
       - name: Run Go tests (Unix)
         if: runner.os != 'Windows'
@@ -188,10 +229,11 @@ jobs:
 
   test-typescript:
     name: TypeScript Tests (${{ matrix.os }})
+    needs: build-c-library
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: ['18', '20', '22']
+        node-version: ['22']
 
     runs-on: ${{ matrix.os }}
 
@@ -202,83 +244,32 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Restore C library cache
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            lib/
+            c/build/
+            testdata/
+          key: c-library-${{ runner.os }}-${{ github.sha }}
+          fail-on-cache-miss: true
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake jpeg libpng giflib nasm
-
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev nasm
-
-      - name: Setup MSYS2
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-make
-            mingw-w64-ucrt-x86_64-libjpeg-turbo
-            mingw-w64-ucrt-x86_64-libpng
-            mingw-w64-ucrt-x86_64-giflib
-            mingw-w64-ucrt-x86_64-nasm
-
-      - name: Build C library (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          bash scripts/build-c-library.sh
-
-      - name: Build C library (Windows - MSYS2)
-        if: runner.os == 'Windows'
-        shell: msys2 {0}
-        run: |
-          bash scripts/build-c-library.sh
-
-      - name: Install TypeScript dependencies (Unix)
-        if: runner.os != 'Windows'
+      - name: Install TypeScript dependencies
         working-directory: typescript
         run: |
           npm install
 
-      - name: Install TypeScript dependencies (Windows)
-        if: runner.os == 'Windows'
-        working-directory: typescript
-        shell: pwsh
-        run: |
-          npm install
-
-      - name: Build TypeScript project (Unix)
-        if: runner.os != 'Windows'
+      - name: Build TypeScript project
         working-directory: typescript
         run: |
           npm run build
 
-      - name: Build TypeScript project (Windows)
-        if: runner.os == 'Windows'
+      - name: Run TypeScript tests
         working-directory: typescript
-        shell: pwsh
-        run: |
-          npm run build
-
-      - name: Run TypeScript tests (Unix)
-        if: runner.os != 'Windows'
-        working-directory: typescript
-        run: |
-          npm test
-
-      - name: Run TypeScript tests (Windows)
-        if: runner.os == 'Windows'
-        working-directory: typescript
-        shell: pwsh
         run: |
           npm test
