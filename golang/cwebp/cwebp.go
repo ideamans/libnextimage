@@ -258,7 +258,9 @@ func NewCommand(opts *Options) (*Command, error) {
 	}
 
 	cmd := &Command{cmd: cCmd}
-	runtime.SetFinalizer(cmd, (*Command).Close)
+	runtime.SetFinalizer(cmd, func(c *Command) {
+		_ = c.Close()
+	})
 	return cmd, nil
 }
 

@@ -3,18 +3,23 @@ package libnextimage
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 )
 
 const (
 	githubUser = "ideamans"
 	githubRepo = "libnextimage"
 	baseURL    = "https://github.com/" + githubUser + "/" + githubRepo + "/releases/download"
+
+	// Default download timeout
+	defaultDownloadTimeout = 5 * time.Minute
 )
 
 // getPlatform returns the current platform string (e.g., "darwin-arm64")
@@ -28,19 +33,59 @@ func getLibraryPath() string {
 	return filepath.Join("lib", platform, "libnextimage.a")
 }
 
-// checkLibraryExists checks if the combined library exists
-func checkLibraryExists() bool {
-	// Get the directory where this Go file is located
+// getCacheDir returns a writable cache directory for downloaded libraries
+// Priority: LIBNEXTIMAGE_CACHE_DIR > XDG_CACHE_HOME/libnextimage > ~/.cache/libnextimage
+func getCacheDir() (string, error) {
+	// Check environment variable first
+	if cacheDir := os.Getenv("LIBNEXTIMAGE_CACHE_DIR"); cacheDir != "" {
+		return cacheDir, nil
+	}
+
+	// Try XDG_CACHE_HOME
+	if xdgCache := os.Getenv("XDG_CACHE_HOME"); xdgCache != "" {
+		return filepath.Join(xdgCache, "libnextimage"), nil
+	}
+
+	// Fall back to user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	return filepath.Join(homeDir, ".cache", "libnextimage"), nil
+}
+
+// getProjectRoot returns the project root directory
+func getProjectRoot() (string, error) {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return false
+		return "", fmt.Errorf("failed to get caller information")
 	}
 	packageDir := filepath.Dir(filename)
-	projectRoot := filepath.Dir(packageDir)
+	return filepath.Dir(packageDir), nil
+}
 
-	libPath := filepath.Join(projectRoot, getLibraryPath())
-	_, err := os.Stat(libPath)
-	return err == nil
+// checkLibraryExists checks if the combined library exists in the project or cache
+func checkLibraryExists() bool {
+	// Check project directory first
+	projectRoot, err := getProjectRoot()
+	if err == nil {
+		libPath := filepath.Join(projectRoot, getLibraryPath())
+		if _, err := os.Stat(libPath); err == nil {
+			return true
+		}
+	}
+
+	// Check cache directory
+	cacheDir, err := getCacheDir()
+	if err == nil {
+		libPath := filepath.Join(cacheDir, getLibraryPath())
+		if _, err := os.Stat(libPath); err == nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CheckLibraryExists is a public wrapper for checking if the library exists
@@ -70,12 +115,23 @@ func getPreviousVersion(currentVersion string) string {
 
 // downloadLibraryVersion downloads a specific version of the pre-built library
 func downloadLibraryVersion(version string) error {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("failed to get caller information")
+	// Try to download to cache directory first
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		return fmt.Errorf("failed to get cache directory: %w", err)
 	}
-	packageDir := filepath.Dir(filename)
-	projectRoot := filepath.Dir(packageDir)
+
+	// Try cache directory first
+	targetDir := cacheDir
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		// If cache directory creation fails, try project directory
+		projectRoot, projErr := getProjectRoot()
+		if projErr != nil {
+			return fmt.Errorf("failed to get target directory: cache=%w, project=%w", err, projErr)
+		}
+		targetDir = projectRoot
+		fmt.Fprintf(os.Stderr, "Warning: Could not create cache directory, using project directory: %v\n", err)
+	}
 
 	platform := getPlatform()
 	archiveName := fmt.Sprintf("libnextimage-v%s-%s.tar.gz", version, platform)
@@ -83,27 +139,41 @@ func downloadLibraryVersion(version string) error {
 
 	fmt.Printf("Downloading libnextimage library for %s...\n", platform)
 	fmt.Printf("URL: %s\n", url)
-	
+	fmt.Printf("Target: %s\n", targetDir)
+
+	// Create HTTP client with timeout and context
+	ctx, cancel := context.WithTimeout(context.Background(), defaultDownloadTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout: defaultDownloadTimeout,
+	}
+
 	// Download the tar.gz archive
-	resp, err := http.Get(url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to download library: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download library: HTTP %d", resp.StatusCode)
 	}
-	
+
 	// Extract the tar.gz archive
 	gzr, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gzr.Close()
-	
+
 	tr := tar.NewReader(gzr)
-	
+
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -112,9 +182,9 @@ func downloadLibraryVersion(version string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tar: %w", err)
 		}
-		
-		target := filepath.Join(projectRoot, header.Name)
-		
+
+		target := filepath.Join(targetDir, header.Name)
+
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(target, 0755); err != nil {
@@ -125,12 +195,12 @@ func downloadLibraryVersion(version string) error {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
-			
+
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return fmt.Errorf("failed to create file: %w", err)
 			}
-			
+
 			if _, err := io.Copy(f, tr); err != nil {
 				f.Close()
 				return fmt.Errorf("failed to write file: %w", err)
@@ -138,8 +208,8 @@ func downloadLibraryVersion(version string) error {
 			f.Close()
 		}
 	}
-	
-	fmt.Printf("Successfully downloaded and extracted library to %s\n", projectRoot)
+
+	fmt.Printf("Successfully downloaded and extracted library to %s\n", targetDir)
 	return nil
 }
 
@@ -151,26 +221,17 @@ func DownloadLibrary(version string) error {
 	return downloadLibraryVersion(version)
 }
 
-// init is called automatically when the package is imported
-// It checks if the library exists and downloads it if necessary
-func init() {
-	// Skip download check in certain cases:
-	// 1. When running go mod download
-	// 2. When the library already exists
-	// 3. When building from source (lib/ directory exists in git)
-
+// EnsureLibrary ensures the library is available, downloading if necessary.
+// This is the recommended way to initialize the library.
+// Returns an error if the library cannot be found or downloaded.
+func EnsureLibrary() error {
 	if checkLibraryExists() {
-		// Library already exists, no need to download
-		return
+		return nil
 	}
 
-	// Library doesn't exist - this might be a go get scenario
-	// Try to download from GitHub Releases
 	fmt.Println("Pre-built library not found. Attempting to download from GitHub Releases...")
 
 	if err := downloadLibrary(); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Failed to download pre-built library v%s: %v\n", LibraryVersion, err)
-
 		// Try to fall back to previous version (handles timing issues during release)
 		previousVersion := getPreviousVersion(LibraryVersion)
 		if previousVersion != "" {
@@ -179,23 +240,18 @@ func init() {
 				fmt.Printf("Successfully downloaded fallback version v%s\n", previousVersion)
 				fmt.Printf("Note: Using v%s library binaries with v%s code.\n", previousVersion, LibraryVersion)
 				fmt.Printf("The library is backwards compatible. Update to v%s binaries when available.\n", LibraryVersion)
-				return
-			} else {
-				fmt.Fprintf(os.Stderr, "Fallback download also failed: %v\n", fallbackErr)
+				return nil
 			}
 		}
 
-		// If the exact version is not available, this might be a timing issue
-		// where the code was released but binaries are still building
-		fmt.Fprintf(os.Stderr, "\nPossible solutions:\n")
-		fmt.Fprintf(os.Stderr, "1. Wait a few minutes for CI to build the release binaries\n")
-		fmt.Fprintf(os.Stderr, "2. Use a previous version temporarily:\n")
-		fmt.Fprintf(os.Stderr, "     go get github.com/ideamans/libnextimage/golang@v0.2.0\n")
-		fmt.Fprintf(os.Stderr, "3. Build the C library manually:\n")
-		fmt.Fprintf(os.Stderr, "     git clone --recursive https://github.com/ideamans/libnextimage.git\n")
-		fmt.Fprintf(os.Stderr, "     cd libnextimage && bash scripts/build-c-library.sh\n")
-		fmt.Fprintf(os.Stderr, "4. Check available releases at:\n")
-		fmt.Fprintf(os.Stderr, "     https://github.com/ideamans/libnextimage/releases\n")
-		// Don't panic here - let the build fail with a more helpful error message
+		return fmt.Errorf("failed to download library v%s: %w", LibraryVersion, err)
 	}
+
+	return nil
+}
+
+// init is intentionally left empty to avoid any side effects on package import.
+// Users must explicitly call EnsureLibrary() to download the library if needed.
+func init() {
+	// No automatic operations on import
 }

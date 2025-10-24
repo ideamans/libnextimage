@@ -40,7 +40,7 @@ func main() {
 	fmt.Println()
 
 	// Get target directory
-	targetDir, err := filepath.Abs(*targetDir)
+	absTargetDir, err := filepath.Abs(*targetDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -48,7 +48,7 @@ func main() {
 
 	// Check if library already exists in target directory
 	platform := runtime.GOOS + "-" + runtime.GOARCH
-	libPath := filepath.Join(targetDir, "lib", platform, "libnextimage.a")
+	libPath := filepath.Join(absTargetDir, "lib", platform, "libnextimage.a")
 
 	if !*force {
 		if _, err := os.Stat(libPath); err == nil {
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// Download the library
-	fmt.Printf("Installing libnextimage v%s to %s...\n", *version, targetDir)
+	fmt.Printf("Installing libnextimage v%s to %s...\n", *version, absTargetDir)
 	fmt.Printf("Platform: %s\n", platform)
 
 	archiveName := fmt.Sprintf("libnextimage-v%s-%s.tar.gz", *version, platform)
@@ -102,7 +102,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		target := filepath.Join(targetDir, header.Name)
+		target := filepath.Join(absTargetDir, header.Name)
 
 		switch header.Typeflag {
 		case tar.TypeDir:

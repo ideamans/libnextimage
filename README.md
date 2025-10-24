@@ -18,24 +18,32 @@ This library provides a unified, command-line compatible interface to libwebp an
 
 ### For Go Users
 
-#### Quick Start
+#### Quick Start (Recommended)
 
-```bash
-# Step 1: Get the module
-go get github.com/ideamans/libnextimage/golang
+**Option 1: Automatic Download in Code**
 
-# Step 2: Install pre-built libraries to your Go module cache (ONE-TIME per version)
-bash <(curl -fsSL https://raw.githubusercontent.com/ideamans/libnextimage/main/scripts/setup-go-module.sh)
+The library will automatically download pre-built binaries to a writable cache directory (`~/.cache/libnextimage` or `$XDG_CACHE_HOME/libnextimage`) when you call `EnsureLibrary()`:
 
-# On Windows (Git Bash/MSYS2), you may need administrator privileges
+```go
+package main
+
+import (
+    "log"
+    "github.com/ideamans/libnextimage/golang"
+)
+
+func main() {
+    // Ensure library is available (downloads if necessary)
+    if err := libnextimage.EnsureLibrary(); err != nil {
+        log.Fatal(err)
+    }
+
+    // Now you can use the library
+    // ...
+}
 ```
 
-The setup script will:
-1. Detect your platform (darwin-arm64, linux-amd64, windows-amd64, etc.)
-2. Download the appropriate pre-built `libnextimage.a` from GitHub Releases
-3. Install it to your Go module cache (may require sudo/administrator permissions)
-
-**Alternative manual installation**:
+**Option 2: Manual Pre-Installation**
 
 ```bash
 # Using standalone install tool to install to current directory
@@ -50,7 +58,12 @@ bash scripts/install.sh
 bash scripts/install.sh v0.1.0
 ```
 
-#### Option 2: Build from Source
+#### Environment Variables
+
+- `LIBNEXTIMAGE_CACHE_DIR`: Custom cache directory for downloaded libraries (default: `~/.cache/libnextimage`)
+- `XDG_CACHE_HOME`: Standard XDG cache directory (used if `LIBNEXTIMAGE_CACHE_DIR` is not set)
+
+#### Build from Source
 
 If you prefer to build from source:
 

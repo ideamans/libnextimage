@@ -1,14 +1,23 @@
 {
   "name": "@ideamans/libnextimage",
   "version": "0.4.0",
-  "description": "TypeScript/Node.js bindings for libnextimage - WebP and AVIF image processing",
+  "description": "TypeScript/Node.js bindings for libnextimage - high-performance WebP and AVIF image processing",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test dist/test/*.test.js",
-    "check": "npm run build && node dist/examples/check-library.js",
-    "prepublishOnly": "npm run build"
+    "test:watch": "npm run build && node --test --watch dist/test/*.test.js",
+    "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js"
   },
   "keywords": [
     "webp",
@@ -16,7 +25,8 @@
     "image",
     "encoding",
     "decoding",
-    "ffi"
+    "ffi",
+    "image-processing"
   ],
   "author": "Ideamans",
   "license": "BSD-3-Clause",
@@ -35,7 +45,12 @@
   "files": [
     "dist",
     "lib",
-    "include",
-    "README.md"
-  ]
+    "scripts",
+    "library-version.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

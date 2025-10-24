@@ -1,141 +1,400 @@
-# libnextimage TypeScript Bindings
+# @ideamans/libnextimage
 
-TypeScript/Node.js bindings for libnextimage - high-performance WebP and AVIF image processing.
+High-performance WebP and AVIF image processing library for Node.js, with TypeScript support.
 
-## Development Setup
+## Features
 
-### 1. Build the C library
+- ✅ **WebP encoding/decoding** - Full WebP support with all encoding options
+- ✅ **AVIF encoding/decoding** - Next-generation AVIF format support
+- ✅ **Zero native compilation** - Pre-built binaries downloaded automatically
+- ✅ **TypeScript native** - Full type definitions included
+- ✅ **Cross-platform** - macOS (ARM64/Intel), Linux (ARM64/x64), Windows (x64)
+- ✅ **High performance** - Direct FFI bindings with minimal overhead
+- ✅ **Production ready** - Memory-safe with automatic resource cleanup
 
-From the project root:
-
-```bash
-# Build both static and shared libraries
-make install-c
-
-# This will create:
-# - lib/shared/libnextimage.dylib (macOS)
-# - lib/shared/libnextimage.so (Linux)
-# - lib/shared/libnextimage.dll (Windows)
-# - lib/include/*.h (headers)
-```
-
-### 2. Install TypeScript dependencies
+## Installation
 
 ```bash
-cd typescript
-npm install
+npm install @ideamans/libnextimage
 ```
 
-### 3. Build TypeScript code
+The package automatically downloads the appropriate pre-built native library for your platform during installation. No compilation required!
 
-```bash
-npm run build
-```
+### Supported Platforms
 
-### 4. Test library loading
+- macOS (Apple Silicon M1/M2/M3 and Intel)
+- Linux (ARM64 and x64)
+- Windows (x64)
 
-```bash
-node -e "console.log(require('./dist/index').getLibraryPath())"
-```
+## Quick Start
 
-Expected output:
-```
-/path/to/libnextimage/lib/shared/libnextimage.dylib
-```
-
-## Project Structure
-
-```
-typescript/
-├── src/
-│   ├── index.ts           # Main entry point
-│   └── library.ts         # Library path resolution
-├── dist/                  # Compiled JavaScript (generated)
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Library Path Resolution
-
-The TypeScript bindings automatically locate the shared library in development mode:
-
-1. **Development mode** (recommended): `../lib/<platform>/libnextimage.{so,dylib,dll}`
-   - Relative to project root
-   - Automatically uses the library built by `make install-c`
-
-2. **Installed package**: `./lib/<platform>/libnextimage.{so,dylib,dll}`
-   - For published npm packages
-   - Includes pre-built binaries
-
-## Usage Example
+### WebP Encoding
 
 ```typescript
-import * as fs from 'fs';
-import { encodeWebP, encodeWebPWithQuality } from '@ideamans/libnextimage';
+import { WebPEncoder } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
 
-// Read JPEG file
-const jpegData = fs.readFileSync('input.jpg');
+// Create encoder with options
+const encoder = new WebPEncoder({
+  quality: 80,
+  method: 6
+})
 
-// Convert to WebP (default quality: 75)
-const webpData = encodeWebP(jpegData);
-fs.writeFileSync('output.webp', webpData);
+// Encode JPEG to WebP
+const jpegData = readFileSync('input.jpg')
+const webpData = encoder.encode(jpegData)
+writeFileSync('output.webp', webpData)
 
-// Convert with specific quality
-const webpHighQuality = encodeWebPWithQuality(jpegData, 90);
-fs.writeFileSync('output-q90.webp', webpHighQuality);
+// Clean up resources
+encoder.close()
 
-console.log(`JPEG: ${jpegData.length} bytes → WebP: ${webpData.length} bytes`);
+console.log(`Converted: ${jpegData.length} bytes → ${webpData.length} bytes`)
 ```
 
-**Platform detection:**
+### AVIF Encoding
 
 ```typescript
-import { getLibraryPath, getPlatform } from '@ideamans/libnextimage';
+import { AVIFEncoder } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
 
-console.log(`Platform: ${getPlatform()}`); // darwin-arm64, linux-amd64, etc.
-console.log(`Library: ${getLibraryPath()}`); // /path/to/libnextimage.dylib
+// Create encoder with options
+const encoder = new AVIFEncoder({
+  quality: 60,
+  speed: 6
+})
+
+// Encode JPEG to AVIF
+const jpegData = readFileSync('input.jpg')
+const avifData = encoder.encode(jpegData)
+writeFileSync('output.avif', avifData)
+
+// Clean up resources
+encoder.close()
+
+console.log(`Converted: ${jpegData.length} bytes → ${avifData.length} bytes`)
 ```
 
-## Development Workflow
+### WebP Decoding
 
-1. Make changes to C library
-2. Rebuild: `make install-c` (from project root)
-3. TypeScript code automatically picks up the new library
-4. No need to copy files manually!
+```typescript
+import { WebPDecoder } from '@ideamans/libnextimage'
+import { readFileSync } from 'fs'
 
-## Running Tests
+const decoder = new WebPDecoder({
+  format: 'RGBA'
+})
 
+const webpData = readFileSync('input.webp')
+const decoded = decoder.decode(webpData)
+
+console.log(`Decoded: ${decoded.width}x${decoded.height}, ${decoded.data.length} bytes`)
+
+decoder.close()
+```
+
+### AVIF Decoding
+
+```typescript
+import { AVIFDecoder } from '@ideamans/libnextimage'
+import { readFileSync } from 'fs'
+
+const decoder = new AVIFDecoder({
+  format: 'RGBA'
+})
+
+const avifData = readFileSync('input.avif')
+const decoded = decoder.decode(avifData)
+
+console.log(`Decoded: ${decoded.width}x${decoded.height}, ${decoded.data.length} bytes`)
+
+decoder.close()
+```
+
+## API Reference
+
+### WebPEncoder
+
+#### Constructor Options
+
+```typescript
+interface WebPEncodeOptions {
+  quality?: number          // 0-100, default: 75
+  lossless?: boolean        // default: false
+  method?: number           // 0-6, default: 4 (quality/speed tradeoff)
+  preset?: WebPPreset       // 'default', 'picture', 'photo', 'drawing', 'icon', 'text'
+
+  // Advanced options
+  targetSize?: number       // Target file size in bytes
+  targetPSNR?: number       // Target PSNR
+  segments?: number         // 1-4, number of segments
+  snsStrength?: number      // 0-100, spatial noise shaping
+  filterStrength?: number   // 0-100, filter strength
+  autofilter?: boolean      // Auto-adjust filter settings
+
+  // Alpha channel
+  alphaQuality?: number     // 0-100, alpha compression quality
+
+  // Metadata
+  keepMetadata?: number     // MetadataEXIF | MetadataICC | MetadataXMP | MetadataAll
+
+  // Transform
+  cropX?: number
+  cropY?: number
+  cropWidth?: number
+  cropHeight?: number
+  resizeWidth?: number
+  resizeHeight?: number
+}
+```
+
+#### Methods
+
+```typescript
+class WebPEncoder {
+  constructor(options?: Partial<WebPEncodeOptions>)
+
+  encode(data: Buffer): Buffer
+  encodeFile(path: string): Buffer
+
+  close(): void
+
+  static getDefaultOptions(): WebPEncodeOptions
+}
+```
+
+### AVIFEncoder
+
+#### Constructor Options
+
+```typescript
+interface AVIFEncodeOptions {
+  quality?: number          // 0-100, default: 60
+  qualityAlpha?: number     // 0-100, default: -1 (use quality)
+  speed?: number            // 0-10, default: 6 (0=slowest/best, 10=fastest/worst)
+
+  bitDepth?: number         // 8, 10, or 12 (default: 8)
+  yuvFormat?: AVIFYUVFormat // 'YUV444', 'YUV422', 'YUV420', 'YUV400'
+
+  // Advanced options
+  lossless?: boolean
+  sharpYUV?: boolean
+  targetSize?: number
+
+  // Threading
+  jobs?: number             // -1=all cores, 0=auto, >0=thread count
+
+  // Tiling
+  tileRowsLog2?: number     // 0-6
+  tileColsLog2?: number     // 0-6
+  autoTiling?: boolean
+
+  // Metadata
+  exifData?: Buffer
+  xmpData?: Buffer
+  iccData?: Buffer
+}
+```
+
+#### Methods
+
+```typescript
+class AVIFEncoder {
+  constructor(options?: Partial<AVIFEncodeOptions>)
+
+  encode(data: Buffer): Buffer
+  encodeFile(path: string): Buffer
+
+  close(): void
+
+  static getDefaultOptions(): AVIFEncodeOptions
+}
+```
+
+### WebPDecoder
+
+```typescript
+interface WebPDecodeOptions {
+  format?: PixelFormat      // 'RGBA', 'BGRA', 'RGB', 'BGR'
+  useThreads?: boolean
+  bypassFiltering?: boolean
+  noFancyUpsampling?: boolean
+
+  cropX?: number
+  cropY?: number
+  cropWidth?: number
+  cropHeight?: number
+
+  scaleWidth?: number
+  scaleHeight?: number
+}
+
+class WebPDecoder {
+  constructor(options?: Partial<WebPDecodeOptions>)
+
+  decode(data: Buffer): DecodedImage
+  decodeFile(path: string): DecodedImage
+
+  close(): void
+
+  static getDefaultOptions(): WebPDecodeOptions
+}
+
+interface DecodedImage {
+  width: number
+  height: number
+  data: Buffer
+  format: PixelFormat
+}
+```
+
+### AVIFDecoder
+
+```typescript
+interface AVIFDecodeOptions {
+  format?: PixelFormat      // 'RGBA', 'BGRA', 'RGB', 'BGR'
+  jobs?: number             // -1=all cores, 0=auto, >0=thread count
+
+  chromaUpsampling?: ChromaUpsampling
+
+  ignoreExif?: boolean
+  ignoreXMP?: boolean
+  ignoreICC?: boolean
+
+  imageSizeLimit?: number
+  imageDimensionLimit?: number
+}
+
+class AVIFDecoder {
+  constructor(options?: Partial<AVIFDecodeOptions>)
+
+  decode(data: Buffer): DecodedImage
+  decodeFile(path: string): DecodedImage
+
+  close(): void
+
+  static getDefaultOptions(): AVIFDecodeOptions
+}
+```
+
+## Batch Processing Example
+
+```typescript
+import { WebPEncoder } from '@ideamans/libnextimage'
+import { readdirSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+
+const encoder = new WebPEncoder({ quality: 80 })
+
+const files = readdirSync('images')
+  .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
+
+for (const file of files) {
+  const inputPath = join('images', file)
+  const outputPath = join('output', file.replace(/\.(jpg|png)$/, '.webp'))
+
+  const inputData = readFileSync(inputPath)
+  const webpData = encoder.encode(inputData)
+  writeFileSync(outputPath, webpData)
+
+  console.log(`✓ ${file}: ${inputData.length} → ${webpData.length} bytes`)
+}
+
+encoder.close()
+```
+
+## Memory Management
+
+**Important:** Always call `close()` when you're done with an encoder or decoder to free native resources.
+
+```typescript
+// Good: Manual cleanup
+const encoder = new WebPEncoder({ quality: 80 })
+try {
+  const result = encoder.encode(data)
+  // ... use result
+} finally {
+  encoder.close()
+}
+
+// Good: Reuse encoder for multiple files
+const encoder = new WebPEncoder({ quality: 80 })
+for (const file of files) {
+  const result = encoder.encode(readFileSync(file))
+  // ... process result
+}
+encoder.close()
+```
+
+## Version Management
+
+This package uses a dual-version system:
+
+- **Package version** (in package.json): NPM package version
+- **Native library version** (in library-version.json): Pre-built library version
+
+This allows patch releases for TypeScript code without rebuilding native libraries.
+
+```typescript
+import { getLibraryVersion } from '@ideamans/libnextimage'
+
+console.log(getLibraryVersion()) // e.g., "0.4.0"
+```
+
+## Troubleshooting
+
+### "Cannot find libnextimage shared library"
+
+The native library wasn't downloaded during installation.
+
+**Solution:**
 ```bash
-# Run all tests
-npm test
-
-# This will:
-# 1. Build TypeScript code (tsc)
-# 2. Run tests using Node.js test runner
-# 3. Convert JPEG images to WebP
-# 4. Save outputs to test-output/ directory
+npm install --force @ideamans/libnextimage
 ```
 
-**Test coverage:**
-- Basic JPEG to WebP conversion
-- Quality settings (default, 90)
-- Lossless encoding
-- Multiple file processing
+### "Unsupported platform"
 
-**Test output:**
-- `test-output/*.webp` - Generated WebP files for manual inspection
+Your platform isn't supported yet. Supported platforms:
+- macOS (ARM64, x64)
+- Linux (ARM64, x64)
+- Windows (x64)
 
-## Next Steps
+**Solution:** Build from source (see main repository README)
 
-- [ ] Implement FFI bindings for WebP encode/decode
-- [ ] Implement FFI bindings for AVIF encode/decode
-- [ ] Add TypeScript type definitions for options
-- [ ] Add comprehensive tests
-- [ ] Add usage examples
+### Memory Issues
 
-## Notes
+If you're processing many images, make sure to:
+1. Reuse encoders/decoders instead of creating new ones
+2. Call `close()` when done
+3. Process images in batches if needed
 
-- The library path resolution is platform-aware (macOS/Linux/Windows)
-- Development mode assumes you're working from the `typescript/` directory
-- The shared library is automatically located - no configuration needed!
+## Examples
+
+See the [examples/typescript/](../examples/typescript/) directory for complete working examples:
+
+- `jpeg-to-webp.ts` - JPEG to WebP conversion
+- `jpeg-to-avif.ts` - JPEG to AVIF conversion
+- `batch-convert.ts` - Batch conversion with progress
+
+## Runtime Support
+
+Currently supported:
+- ✅ **Node.js** 18+ (Full support)
+
+Planned:
+- 🔄 **Deno** (Coming soon)
+- 🔄 **Bun** (Coming soon)
+
+## License
+
+BSD-3-Clause
+
+## Links
+
+- [GitHub Repository](https://github.com/ideamans/libnextimage)
+- [Examples](../examples/typescript/)
+- [Version Management Guide](./VERSION-MANAGEMENT.md)
+- [Issue Tracker](https://github.com/ideamans/libnextimage/issues)
+
+## Contributing
+
+Contributions are welcome! Please see the main repository for contribution guidelines.

@@ -1,0 +1,6 @@
+node_modules/
+output/*.webp
+output/*.avif
+output/*.jpg
+output/*.png
+package-lock.json
