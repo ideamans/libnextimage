@@ -123,6 +123,21 @@ export class AVIFDecoder {
         bitDepth: Number(output.bit_depth)
       };
 
+      // Copy YUV planes if present (for YUV formats)
+      if (output.u_plane && output.u_size > 0) {
+        const uSize = Number(output.u_size);
+        const uRawData = koffi.decode(output.u_plane, koffi.array('uint8_t', uSize));
+        result.uPlane = Buffer.from(uRawData as any);
+        result.uStride = Number(output.u_stride);
+      }
+
+      if (output.v_plane && output.v_size > 0) {
+        const vSize = Number(output.v_size);
+        const vRawData = koffi.decode(output.v_plane, koffi.array('uint8_t', vSize));
+        result.vPlane = Buffer.from(vRawData as any);
+        result.vStride = Number(output.v_stride);
+      }
+
       return result;
     } finally {
       // Always free C-allocated memory, even on error

@@ -22,3 +22,7 @@ export { WebPDecoder } from './webp-decoder';
 // Export AVIF classes
 export { AVIFEncoder } from './avif-encoder';
 export { AVIFDecoder } from './avif-decoder';
+
+// Export GIF conversion classes
+export { GIF2WebPConverter } from './gif2webp-converter';
+export { WebP2GIFConverter, WebP2GIFOptions } from './webp2gif-converter';

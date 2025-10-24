@@ -8,6 +8,7 @@ import "C"
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"unsafe"
 )
 
@@ -741,7 +742,16 @@ func NewWebPEncoder(optsFn func(*WebPEncodeOptions)) (*WebPEncoder, error) {
 		return nil, fmt.Errorf("webp encoder: failed to create encoder: %s", getLastError())
 	}
 
-	return &WebPEncoder{encoderPtr: encoderPtr}, nil
+	encoder := &WebPEncoder{encoderPtr: encoderPtr}
+
+	// Set up finalizer for automatic cleanup
+	runtime.SetFinalizer(encoder, func(e *WebPEncoder) {
+		if e.encoderPtr != nil {
+			C.nextimage_webp_encoder_destroy(e.encoderPtr)
+		}
+	})
+
+	return encoder, nil
 }
 
 // Encode encodes image file data (JPEG, PNG, etc.) to WebP format
@@ -780,6 +790,7 @@ func (e *WebPEncoder) Encode(imageFileData []byte) ([]byte, error) {
 // Must be called when done using the encoder
 func (e *WebPEncoder) Close() {
 	if e.encoderPtr != nil {
+		runtime.SetFinalizer(e, nil) // Cancel finalizer
 		C.nextimage_webp_encoder_destroy(e.encoderPtr)
 		e.encoderPtr = nil
 	}
@@ -823,7 +834,16 @@ func NewWebPDecoder(optsFn func(*WebPDecodeOptions)) (*WebPDecoder, error) {
 		return nil, fmt.Errorf("webp decoder: failed to create decoder: %s", getLastError())
 	}
 
-	return &WebPDecoder{decoderPtr: decoderPtr}, nil
+	decoder := &WebPDecoder{decoderPtr: decoderPtr}
+
+	// Set up finalizer for automatic cleanup
+	runtime.SetFinalizer(decoder, func(d *WebPDecoder) {
+		if d.decoderPtr != nil {
+			C.nextimage_webp_decoder_destroy(d.decoderPtr)
+		}
+	})
+
+	return decoder, nil
 }
 
 // Decode decodes WebP data to pixel data
@@ -862,6 +882,7 @@ func (d *WebPDecoder) Decode(webpData []byte) (*DecodedImage, error) {
 // Must be called when done using the decoder
 func (d *WebPDecoder) Close() {
 	if d.decoderPtr != nil {
+		runtime.SetFinalizer(d, nil) // Cancel finalizer
 		C.nextimage_webp_decoder_destroy(d.decoderPtr)
 		d.decoderPtr = nil
 	}

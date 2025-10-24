@@ -188,12 +188,18 @@ export interface AVIFDecodeOptions {
  * Decoded image data
  */
 export interface DecodedImage {
-  data: Buffer;               // Raw pixel data
+  data: Buffer;               // Raw pixel data (Y plane for YUV formats)
   width: number;              // Image width in pixels
   height: number;             // Image height in pixels
-  stride: number;             // Bytes per row
+  stride: number;             // Bytes per row (Y plane stride for YUV)
   format: PixelFormat;        // Pixel format
   bitDepth: number;           // Bit depth (8, 10, 12)
+
+  // YUV plane data (only present for YUV formats)
+  uPlane?: Buffer;            // U/Cb plane data
+  vPlane?: Buffer;            // V/Cr plane data
+  uStride?: number;           // U plane bytes per row
+  vStride?: number;           // V plane bytes per row
 }
 
 /**

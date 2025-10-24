@@ -126,19 +126,10 @@ type AVIFDecodeOptions struct {
 	// Output format
 	Format PixelFormat // desired pixel format (default: RGBA)
 
-	// Output quality settings (format-specific)
-	OutputDepth     int // 8 or 16 bit depth (PNG only, default: 8)
-	JPEGQuality     int // JPEG quality 0-100 (JPEG only, default: 90)
-	PNGCompressLevel int // PNG compression 0-9 (PNG only, -1=default)
-
-	// Color processing
-	RawColor bool // Output raw RGB without alpha multiplication (JPEG only, default: false)
-
 	// Metadata handling
 	IgnoreExif bool // Ignore embedded EXIF metadata
 	IgnoreXMP  bool // Ignore embedded XMP metadata
 	IgnoreICC  bool // Ignore embedded ICC profile
-	ICCData    []byte // Override ICC profile (nil=use embedded or none)
 
 	// Security limits
 	ImageSizeLimit      uint32 // Maximum image size in total pixels (default: 268435456)
@@ -150,9 +141,16 @@ type AVIFDecodeOptions struct {
 	// Chroma upsampling (for YUV to RGB conversion)
 	ChromaUpsampling ChromaUpsampling // 0=automatic (default), 1=fastest, 2=best_quality, 3=nearest, 4=bilinear
 
-	// Image sequence/progressive handling
-	FrameIndex   int  // Frame index to decode (default: 0, -1=all frames)
-	Progressive  bool // Enable progressive AVIF processing (default: false)
+	// Image manipulation
+	CropX      int  // Crop rectangle X coordinate
+	CropY      int  // Crop rectangle Y coordinate
+	CropWidth  int  // Crop rectangle width
+	CropHeight int  // Crop rectangle height
+	UseCrop    bool // Enable cropping
+
+	ResizeWidth  int  // Resize target width
+	ResizeHeight int  // Resize target height
+	UseResize    bool // Enable resizing
 }
 
 // DefaultAVIFEncodeOptions returns default AVIF encoding options
@@ -206,19 +204,10 @@ func DefaultAVIFDecodeOptions() AVIFDecodeOptions {
 		// Output format
 		Format: PixelFormat(opts.format),
 
-		// Output quality settings
-		OutputDepth:     8,  // default 8-bit
-		JPEGQuality:     90, // default JPEG quality
-		PNGCompressLevel: -1, // -1 = use libpng default
-
-		// Color processing
-		RawColor: false,
-
 		// Metadata handling
 		IgnoreExif: opts.ignore_exif != 0,
 		IgnoreXMP:  opts.ignore_xmp != 0,
 		IgnoreICC:  opts.ignore_icc != 0,
-		ICCData:    nil, // no override by default
 
 		// Security limits
 		ImageSizeLimit:      uint32(opts.image_size_limit),
@@ -230,9 +219,15 @@ func DefaultAVIFDecodeOptions() AVIFDecodeOptions {
 		// Chroma upsampling
 		ChromaUpsampling: ChromaUpsampling(opts.chroma_upsampling),
 
-		// Image sequence/progressive
-		FrameIndex:  0,     // decode first frame by default
-		Progressive: false, // progressive disabled by default
+		// Image manipulation
+		CropX:        int(opts.crop_x),
+		CropY:        int(opts.crop_y),
+		CropWidth:    int(opts.crop_width),
+		CropHeight:   int(opts.crop_height),
+		UseCrop:      opts.use_crop != 0,
+		ResizeWidth:  int(opts.resize_width),
+		ResizeHeight: int(opts.resize_height),
+		UseResize:    opts.use_resize != 0,
 	}
 }
 
@@ -330,6 +325,8 @@ func (opts *AVIFDecodeOptions) toCDecodeOptions() C.NextImageAVIFDecodeOptions {
 	}
 
 	copts.format = C.NextImagePixelFormat(opts.Format)
+
+	// Metadata handling
 	if opts.IgnoreExif {
 		copts.ignore_exif = 1
 	} else {
@@ -355,6 +352,26 @@ func (opts *AVIFDecodeOptions) toCDecodeOptions() C.NextImageAVIFDecodeOptions {
 
 	// Chroma upsampling
 	copts.chroma_upsampling = C.int(opts.ChromaUpsampling)
+
+	// Image manipulation - Cropping
+	copts.crop_x = C.int(opts.CropX)
+	copts.crop_y = C.int(opts.CropY)
+	copts.crop_width = C.int(opts.CropWidth)
+	copts.crop_height = C.int(opts.CropHeight)
+	if opts.UseCrop {
+		copts.use_crop = 1
+	} else {
+		copts.use_crop = 0
+	}
+
+	// Image manipulation - Resizing
+	copts.resize_width = C.int(opts.ResizeWidth)
+	copts.resize_height = C.int(opts.ResizeHeight)
+	if opts.UseResize {
+		copts.use_resize = 1
+	} else {
+		copts.use_resize = 0
+	}
 
 	return copts
 }

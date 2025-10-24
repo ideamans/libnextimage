@@ -9,5 +9,9 @@
   },
   "dependencies": {
     "@ideamans/libnextimage": "file:../../typescript"
-  }
+  },
+  "trustedDependencies": [
+    "@ideamans/libnextimage",
+    "koffi"
+  ]
 }

@@ -6,6 +6,7 @@ High-performance WebP and AVIF image processing library for Node.js, with TypeSc
 
 - ✅ **WebP encoding/decoding** - Full WebP support with all encoding options
 - ✅ **AVIF encoding/decoding** - Next-generation AVIF format support
+- ✅ **GIF conversion** - Convert between GIF and WebP formats (including animated GIFs)
 - ✅ **Zero native compilation** - Pre-built binaries downloaded automatically
 - ✅ **TypeScript native** - Full type definitions included
 - ✅ **Cross-platform** - macOS (ARM64/Intel), Linux (ARM64/x64), Windows (x64)
@@ -108,6 +109,44 @@ const decoded = decoder.decode(avifData)
 console.log(`Decoded: ${decoded.width}x${decoded.height}, ${decoded.data.length} bytes`)
 
 decoder.close()
+```
+
+### GIF to WebP Conversion
+
+```typescript
+import { GIF2WebPConverter } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
+
+const converter = new GIF2WebPConverter({
+  quality: 80,
+  method: 6  // Higher quality for animations
+})
+
+// Converts animated GIFs to animated WebP
+const gifData = readFileSync('animated.gif')
+const webpData = converter.convert(gifData)
+
+writeFileSync('animated.webp', webpData)
+converter.close()
+
+console.log(`GIF: ${gifData.length} bytes → WebP: ${webpData.length} bytes`)
+```
+
+### WebP to GIF Conversion
+
+```typescript
+import { WebP2GIFConverter } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
+
+const converter = new WebP2GIFConverter()
+
+const webpData = readFileSync('image.webp')
+const gifData = converter.convert(webpData)
+
+writeFileSync('output.gif', gifData)
+converter.close()
+
+console.log(`WebP: ${webpData.length} bytes → GIF: ${gifData.length} bytes`)
 ```
 
 ## API Reference
@@ -242,8 +281,16 @@ class WebPDecoder {
 interface DecodedImage {
   width: number
   height: number
-  data: Buffer
+  data: Buffer              // Y plane for YUV formats, full data for RGB formats
   format: PixelFormat
+  stride: number            // Bytes per row (Y plane stride for YUV)
+  bitDepth: number          // Bit depth (8, 10, 12)
+
+  // YUV plane data (only present for YUV formats)
+  uPlane?: Buffer           // U/Cb plane data
+  vPlane?: Buffer           // V/Cr plane data
+  uStride?: number          // U plane bytes per row
+  vStride?: number          // V plane bytes per row
 }
 ```
 
@@ -276,6 +323,92 @@ class AVIFDecoder {
 }
 ```
 
+### GIF2WebPConverter
+
+Converts GIF images (including animated GIFs) to WebP format.
+
+#### Constructor Options
+
+```typescript
+// GIF2WebPConverter accepts the same options as WebPEncoder
+interface WebPEncodeOptions {
+  quality?: number          // 0-100, default: 75
+  lossless?: boolean        // default: false
+  method?: number           // 0-6, default: 4
+  // ... see WebPEncoder options above
+}
+```
+
+#### Methods
+
+```typescript
+class GIF2WebPConverter {
+  constructor(options?: Partial<WebPEncodeOptions>)
+
+  convert(gifData: Buffer): Buffer  // Converts GIF to WebP (preserves animation)
+
+  close(): void
+}
+```
+
+#### Example: Animated GIF Conversion
+
+```typescript
+import { GIF2WebPConverter } from '@ideamans/libnextimage'
+
+const converter = new GIF2WebPConverter({
+  quality: 80,
+  method: 6  // Higher quality for animations
+})
+
+const gifData = readFileSync('animated.gif')
+const webpData = converter.convert(gifData)
+
+// Animated WebP will be much smaller than GIF
+console.log(`Compression: ${((1 - webpData.length / gifData.length) * 100).toFixed(1)}%`)
+
+writeFileSync('animated.webp', webpData)
+converter.close()
+```
+
+### WebP2GIFConverter
+
+Converts WebP images to GIF format.
+
+#### Constructor Options
+
+```typescript
+interface WebP2GIFOptions {
+  reserved?: number  // Reserved for future use
+}
+```
+
+#### Methods
+
+```typescript
+class WebP2GIFConverter {
+  constructor(options?: WebP2GIFOptions)
+
+  convert(webpData: Buffer): Buffer  // Converts WebP to GIF
+
+  close(): void
+}
+```
+
+#### Example: WebP to GIF
+
+```typescript
+import { WebP2GIFConverter } from '@ideamans/libnextimage'
+
+const converter = new WebP2GIFConverter()
+
+const webpData = readFileSync('image.webp')
+const gifData = converter.convert(webpData)
+
+writeFileSync('output.gif', gifData)
+converter.close()
+```
+
 ## Batch Processing Example
 
 ```typescript
@@ -304,16 +437,16 @@ encoder.close()
 
 ## Memory Management
 
-**Important:** Always call `close()` when you're done with an encoder or decoder to free native resources.
+All encoder/decoder/converter instances use FinalizationRegistry for automatic cleanup when garbage collected. However, **it's strongly recommended to explicitly call `close()`** for deterministic resource management.
 
 ```typescript
-// Good: Manual cleanup
+// Best practice: Explicit cleanup with try/finally
 const encoder = new WebPEncoder({ quality: 80 })
 try {
   const result = encoder.encode(data)
   // ... use result
 } finally {
-  encoder.close()
+  encoder.close()  // Explicitly release resources
 }
 
 // Good: Reuse encoder for multiple files
@@ -323,6 +456,12 @@ for (const file of files) {
   // ... process result
 }
 encoder.close()
+
+// Automatic cleanup (not recommended for production)
+// Resources will be freed eventually, but timing is unpredictable
+const encoder = new WebPEncoder({ quality: 80 })
+const result = encoder.encode(data)
+// encoder will be cleaned up by garbage collector eventually
 ```
 
 ## Version Management

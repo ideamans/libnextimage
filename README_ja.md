@@ -1,391 +1,262 @@
 # libnextimage
 
-高性能WebP/AVIFエンコード/デコードライブラリ（Go用FFIインターフェース）
-
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/ideamans/libnextimage)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0--alpha-orange)](DEPENDENCIES.txt)
+WebPとAVIFの高性能画像エンコード/デコードライブラリ - Go、TypeScript/Node.js、Bun、Denoに対応
 
 ## 概要
 
-`libnextimage`は、WebPとAVIFのエンコード/デコード機能への直接FFIアクセスを提供し、画像変換操作のために別プロセスを起動するオーバーヘッドを排除します。
+`libnextimage`は、libwebpとlibavifへの統一されたインターフェースを提供し、公式CLIツール（`cwebp`、`dwebp`、`avifenc`、`avifdec`）と同じ動作をしながら、複数の言語から便利にアクセスできるようにします。
 
-### 主な機能
+## 主な機能
 
-- **ゼロプロセスオーバーヘッド**: cwebp/dwebp/avifenc/avifdecプロセスを起動せず、ライブラリを直接呼び出し
-- **マルチプレーンサポート**: YUVプレーナー形式の完全サポート（4:2:0、4:2:2、4:4:4）
-- **高ビット深度**: 8ビット、10ビット、12ビットAVIFエンコードのサポート
-- **メモリセーフ**: AddressSanitizerとUndefinedBehaviorSanitizerによる包括的なテスト
-- **スレッドセーフ**: スレッドローカルエラーハンドリングと並行エンコード/デコード
-- **Go統合**: バイト、ファイル、ストリーム用の明示的な関数を持つGoらしいAPI
+- **WebPとAVIFのサポート**: 完全なエンコード/デコード機能
+- **複数言語対応**: Go、TypeScript/Node.js、Bun、Deno
+- **CLIツールとの互換性**: 公式ツールと同一の出力を生成
+- **クロスプラットフォーム**: macOS（Intel/ARM）、Linux（x64/ARM64）、Windows
+- **簡単なインストール**: パッケージマネージャーによる自動ライブラリダウンロード
+- **依存関係なし**: 必要なライブラリをすべてバンドル
 
-## 使用例（Go）
+## インストール
 
-### WebPエンコード/デコード
+### Go
+
+```bash
+go get github.com/ideamans/libnextimage/golang
+```
+
+ライブラリは初回実行時に自動的にダウンロードされます。明示的にダウンロードすることもできます：
 
 ```go
-package main
+import "github.com/ideamans/libnextimage/golang"
 
+func main() {
+    // ライブラリを確保（必要に応じてダウンロード）
+    if err := libnextimage.EnsureLibrary(); err != nil {
+        panic(err)
+    }
+    // ... 使用する
+}
+```
+
+**環境変数:**
+- `LIBNEXTIMAGE_CACHE_DIR`: カスタムキャッシュディレクトリ（デフォルト: `~/.cache/libnextimage`）
+- `XDG_CACHE_HOME`: 標準XDGキャッシュディレクトリ
+
+### TypeScript/Node.js
+
+npmでインストール - ネイティブライブラリはインストール時に自動ダウンロードされます：
+
+```bash
+npm install @ideamans/libnextimage
+```
+
+パッケージは自動的にプラットフォーム（macOS、Linux、Windows）に適したネイティブライブラリをGitHub Releasesからダウンロードします。
+
+**クイックスタート:**
+
+```typescript
+import { WebPEncoder, AVIFEncoder } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
+
+// PNGをWebPにエンコード
+const pngData = readFileSync('input.png')
+const webpEncoder = new WebPEncoder({ quality: 90 })
+const webpData = webpEncoder.encode(pngData)
+webpEncoder.close()
+writeFileSync('output.webp', webpData)
+
+// AVIFにエンコード
+const avifEncoder = new AVIFEncoder({ quality: 60, speed: 6 })
+const avifData = avifEncoder.encode(pngData)
+avifEncoder.close()
+writeFileSync('output.avif', avifData)
+```
+
+詳細は[typescript/README.md](typescript/README.md)をご覧ください。
+
+### C/C++
+
+[GitHub Releases](https://github.com/ideamans/libnextimage/releases)からビルド済みバイナリをダウンロードするか、インストールスクリプトを使用：
+
+```bash
+# リポジトリをクローン
+git clone https://github.com/ideamans/libnextimage.git
+cd libnextimage
+
+# プラットフォームに合わせてインストール（GitHub Releasesからダウンロード）
+bash scripts/install.sh
+
+# または特定バージョンをインストール
+bash scripts/install.sh v0.4.0
+```
+
+インストールされるもの:
+- `lib/<platform>/libnextimage.a` - 静的ライブラリ（C/C++とGo用）
+- `include/*.h` - ヘッダーファイル
+
+詳細は[ソースからのビルド](#ソースからのビルド)セクションをご覧ください。
+
+## 使用例
+
+### Go
+
+```go
 import (
-    "fmt"
     "os"
     "github.com/ideamans/libnextimage/golang"
 )
 
-func main() {
-    // PNGファイルを読み込み
-    pngData, err := os.ReadFile("input.png")
-    if err != nil {
-        panic(err)
-    }
-
-    // PNG→WebP変換
-    opts := libnextimage.DefaultWebPEncodeOptions()
-    opts.Quality = 90.0
-    opts.Method = 6  // 高品質
-
-    webpData, err := libnextimage.WebPEncodeBytes(pngData, opts)
-    if err != nil {
-        panic(err)
-    }
-
-    // WebPファイルを保存
-    os.WriteFile("output.webp", webpData, 0644)
-    fmt.Printf("PNG→WebP変換完了: %d バイト\n", len(webpData))
-
-    // WebP→PNGに戻す（メモリ版）
-    pngDataOut, err := libnextimage.WebPDecodeToPNGBytes(
-        webpData,
-        libnextimage.DefaultWebPDecodeOptions(),
-        9, // PNG圧縮レベル
-    )
-    if err != nil {
-        panic(err)
-    }
-
-    fmt.Printf("WebP→PNG変換完了: %d バイト\n", len(pngDataOut))
-    os.WriteFile("output.png", pngDataOut, 0644)
-}
-```
-
-### AVIF高度なオプションでエンコード
-
-```go
-import "github.com/ideamans/libnextimage/golang"
-
-// PNGを高品質でAVIFにエンコード
-opts := libnextimage.DefaultAVIFEncodeOptions()
-opts.Quality = 90
-opts.Speed = 4
-opts.YUVFormat = 0  // 4:4:4で最高品質
-
-avifData, err := libnextimage.AVIFEncodeFile("input.png", opts)
-if err != nil {
+// ライブラリが利用可能か確認（必要に応じてダウンロード）
+if err := libnextimage.EnsureLibrary(); err != nil {
     panic(err)
 }
 
+// PNGをWebPにエンコード
+data, _ := os.ReadFile("input.png")
+opts := libnextimage.DefaultWebPEncodeOptions()
+opts.Quality = 90
+
+webpData, _ := libnextimage.WebPEncode(data, opts)
+os.WriteFile("output.webp", webpData, 0644)
+
+// AVIFにエンコード
+avifOpts := libnextimage.DefaultAVIFEncodeOptions()
+avifOpts.Quality = 60
+avifOpts.Speed = 6
+
+avifData, _ := libnextimage.AVIFEncode(data, avifOpts)
 os.WriteFile("output.avif", avifData, 0644)
 ```
 
-### AVIF→PNG/JPEG変換
+### TypeScript/Node.js
 
-```go
-import "github.com/ideamans/libnextimage/golang"
+```typescript
+import { WebPEncoder, AVIFEncoder } from '@ideamans/libnextimage'
+import { readFileSync, writeFileSync } from 'fs'
 
-// AVIF→PNG変換（圧縮付き）
-avifData, _ := os.ReadFile("input.avif")
-decOpts := libnextimage.DefaultAVIFDecodeOptions()
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBestQuality
+const imageData = readFileSync('input.png')
 
-err := libnextimage.AVIFDecodeToPNG(
-    avifData,
-    "output.png",
-    decOpts,
-    9,  // PNG圧縮レベル (0-9, -1=デフォルト)
-)
+// WebPエンコード
+const webpEncoder = new WebPEncoder({ quality: 90 })
+const webpData = webpEncoder.encode(imageData)
+webpEncoder.close()
+writeFileSync('output.webp', webpData)
 
-// AVIF→JPEG変換
-err = libnextimage.AVIFDecodeToJPEG(
-    avifData,
-    "output.jpg",
-    decOpts,
-    90,  // JPEG品質 (1-100)
-)
-
-// ファイルベースの変換
-err = libnextimage.AVIFDecodeFileToPNG(
-    "input.avif",
-    "output.png",
-    decOpts,
-    -1,  // デフォルト圧縮
-)
+// AVIFエンコード
+const avifEncoder = new AVIFEncoder({ quality: 60, speed: 6 })
+const avifData = avifEncoder.encode(imageData)
+avifEncoder.close()
+writeFileSync('output.avif', avifData)
 ```
 
-### クロマアップサンプリングオプション
+### C
 
-```go
-import "github.com/ideamans/libnextimage/golang"
+```c
+#include "nextimage.h"
+#include "webp.h"
 
-decOpts := libnextimage.DefaultAVIFDecodeOptions()
+NextImageWebPEncodeOptions opts;
+nextimage_webp_default_encode_options(&opts);
+opts.quality = 90;
 
-// 利用可能なアップサンプリングモード:
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingAutomatic   // 0 (デフォルト)
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingFastest     // 1 (最速)
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBestQuality // 2 (最高品質)
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingNearest     // 3 (最近傍)
-decOpts.ChromaUpsampling = libnextimage.ChromaUpsamplingBilinear    // 4 (バイリニア)
-```
+NextImageBuffer input, output;
+// ... 入力データを読み込み ...
 
-### AVIFデコード時のセキュリティ制限
+NextImageStatus status = nextimage_webp_encode(
+    input.data, input.size, &opts, &output
+);
 
-```go
-import "github.com/ideamans/libnextimage/golang"
-
-decOpts := libnextimage.DefaultAVIFDecodeOptions()
-decOpts.ImageSizeLimit = 100_000_000      // 最大1億ピクセル
-decOpts.ImageDimensionLimit = 16384       // 最大16384px幅/高さ
-decOpts.StrictFlags = 1                   // 厳格な検証を有効化
-
-decoded, err := libnextimage.AVIFDecodeBytes(avifData, decOpts)
-```
-
-## API リファレンス
-
-### AVIF変換関数
-
-#### AVIFDecodeToPNG
-
-AVIFデータをデコードしてPNGファイルとして保存します。
-
-```go
-func AVIFDecodeToPNG(
-    avifData []byte,
-    outputPath string,
-    options AVIFDecodeOptions,
-    pngCompressionLevel int,
-) error
-```
-
-**パラメータ:**
-- `avifData`: AVIFファイルのバイナリデータ
-- `outputPath`: 出力PNGファイルのパス
-- `options`: デコードオプション
-- `pngCompressionLevel`: PNG圧縮レベル
-  - `0`: 無圧縮（最速、最大サイズ）
-  - `9`: 最高圧縮（最遅、最小サイズ）
-  - `-1`: デフォルト圧縮
-
-#### AVIFDecodeToJPEG
-
-AVIFデータをデコードしてJPEGファイルとして保存します。
-
-```go
-func AVIFDecodeToJPEG(
-    avifData []byte,
-    outputPath string,
-    options AVIFDecodeOptions,
-    jpegQuality int,
-) error
-```
-
-**パラメータ:**
-- `avifData`: AVIFファイルのバイナリデータ
-- `outputPath`: 出力JPEGファイルのパス
-- `options`: デコードオプション
-- `jpegQuality`: JPEG品質 (1-100)
-  - `1`: 最低品質（最小サイズ）
-  - `100`: 最高品質（最大サイズ）
-  - 範囲外の値は自動的に補正されます
-
-#### AVIFDecodeFileToPNG
-
-AVIFファイルをPNGファイルに変換します。
-
-```go
-func AVIFDecodeFileToPNG(
-    avifPath string,
-    pngPath string,
-    options AVIFDecodeOptions,
-    pngCompressionLevel int,
-) error
-```
-
-#### AVIFDecodeFileToJPEG
-
-AVIFファイルをJPEGファイルに変換します。
-
-```go
-func AVIFDecodeFileToJPEG(
-    avifPath string,
-    jpegPath string,
-    options AVIFDecodeOptions,
-    jpegQuality int,
-) error
-```
-
-### AVIFDecodeOptions
-
-```go
-type AVIFDecodeOptions struct {
-    UseThreads          bool             // マルチスレッド有効化
-    Format              PixelFormat      // ピクセル形式 (RGBA, RGB, etc.)
-    IgnoreExif          bool             // EXIFメタデータを無視
-    IgnoreXMP           bool             // XMPメタデータを無視
-    IgnoreICC           bool             // ICCプロファイルを無視
-    ImageSizeLimit      uint32           // 最大画像サイズ（総ピクセル数）
-    ImageDimensionLimit uint32           // 最大画像寸法（幅または高さ）
-    StrictFlags         int              // 厳格な検証フラグ
-    ChromaUpsampling    ChromaUpsampling // クロマアップサンプリングモード
+if (status == NEXTIMAGE_STATUS_OK) {
+    // output.data, output.sizeを使用
+    nextimage_buffer_free(&output);
 }
 ```
 
-**デフォルト値:**
-- `ImageSizeLimit`: 268,435,456 ピクセル（16384 × 16384）
-- `ImageDimensionLimit`: 32768
-- `StrictFlags`: 1（厳格な検証有効）
-- `ChromaUpsampling`: 0（自動）
+## サポートプラットフォーム
 
-### ChromaUpsampling型
+- **macOS**: Intel（x64）、Apple Silicon（ARM64）
+- **Linux**: x64、ARM64
+- **Windows**: x64
 
-```go
-type ChromaUpsampling int
+すべてのプラットフォーム向けのビルド済みバイナリが[GitHub Releases](https://github.com/ideamans/libnextimage/releases)で提供されています。
 
-const (
-    ChromaUpsamplingAutomatic   ChromaUpsampling = 0  // 自動選択（デフォルト）
-    ChromaUpsamplingFastest     ChromaUpsampling = 1  // 最速
-    ChromaUpsamplingBestQuality ChromaUpsampling = 2  // 最高品質
-    ChromaUpsamplingNearest     ChromaUpsampling = 3  // 最近傍補間
-    ChromaUpsamplingBilinear    ChromaUpsampling = 4  // バイリニア補間
-)
-```
+## ソースからのビルド
 
-## クイックスタート
-
-### ソースからビルド
-
-#### 前提条件
+### 必要なもの
 
 - CMake 3.15以降
-- C11互換コンパイラ（GCC、Clang、またはMSVC）
-- Git（サブモジュール管理用）
+- C11対応コンパイラ（GCC、Clang、MSVC）
+- システムライブラリ: libjpeg、libpng、libgif
 
-#### 基本的なビルド
+### macOS
 
 ```bash
-# リポジトリをクローン
-git clone --recursive https://github.com/ideamans/libnextimage.git
-cd libnextimage
-
-# Cライブラリをビルド
-cd c
-mkdir build && cd build
-cmake ..
-cmake --build .
-
-# テストを実行
-ctest --output-on-failure
+brew install cmake jpeg libpng giflib
+bash scripts/build-c-library.sh
 ```
+
+### Linux
+
+```bash
+sudo apt-get install cmake build-essential libjpeg-dev libpng-dev libgif-dev
+bash scripts/build-c-library.sh
+```
+
+### ビルド出力
+
+ビルドスクリプトは以下を生成します：
+- `lib/<platform>/libnextimage.a` - 統合静的ライブラリ
+- `include/*.h` - ヘッダーファイル
 
 ## テスト
 
-### Goテストの実行
+### Go
 
 ```bash
 cd golang
-
-# 全テスト（詳細表示）
 go test -v
-
-# AVIFテストのみ実行
-go test -v -run TestAVIF
-
-# AVIF変換テストのみ実行
-go test -v -run TestAVIF.*Convert
-
-# レースディテクター付き
-go test -race
-
-# カバレッジ
-go test -cover
 ```
 
-### テスト結果
+### TypeScript/Node.js
 
-**AVIFテスト: 22グループ、65個のテストケース - 全てパス** ✅
-
-- デコード機能: 18グループ、53テスト
-- PNG/JPEG変換機能: 4グループ、12テスト
-
-## avifdec互換性
-
-avifdecコマンドライン�ールの**コア機能を完全サポート** ✅
-
-### 対応機能
-
-- ✅ **メタデータ無視オプション**: `ignore_exif`, `ignore_xmp`, `ignore_icc`
-- ✅ **セキュリティ制限**: `image_size_limit`, `image_dimension_limit` 🔒
-- ✅ **厳格な検証制御**: `strict_flags`
-- ✅ **PNG/JPEG変換機能**: `-q`, `--png-compress` 🎨
-- ✅ **クロマアップサンプリング**: `-u, --upsampling`
-
-### avifdecオプション対応表
-
-| avifdecオプション | libnextimage API | 説明 |
-|------------------|------------------|------|
-| `-q, --quality Q` | `AVIFDecodeToJPEG()` の `jpegQuality` | JPEG品質 (1-100) |
-| `--png-compress L` | `AVIFDecodeToPNG()` の `pngCompressionLevel` | PNG圧縮レベル (0-9) |
-| `-u, --upsampling U` | `options.ChromaUpsampling` | クロマアップサンプリングモード |
-| `--no-strict` | `options.StrictFlags = 0` | 厳格な検証を無効化 |
-| `--size-limit C` | `options.ImageSizeLimit` | 最大画像サイズ（ピクセル数） |
-| `--dimension-limit C` | `options.ImageDimensionLimit` | 最大画像寸法 |
-| `--ignore-exif` | `options.IgnoreExif = true` | EXIFメタデータを無視 |
-| `--ignore-xmp` | `options.IgnoreXMP = true` | XMPメタデータを無視 |
-| `--ignore-icc` | `options.IgnoreICC = true` | ICCプロファイルを無視 |
-
-## プロジェクト構造
-
-```
-libnextimage/
-├── c/                        # C FFI層
-│   ├── include/              # 公開ヘッダー
-│   │   ├── nextimage.h       # メインFFIインターフェース
-│   │   ├── webp.h            # WebP API
-│   │   └── avif.h            # AVIF API
-│   ├── src/                  # 実装
-│   │   ├── common.c          # メモリ・エラーハンドリング
-│   │   ├── webp.c            # WebP実装
-│   │   └── avif.c            # AVIF実装
-│   └── CMakeLists.txt
-├── deps/                     # 依存関係（gitサブモジュール）
-│   ├── libwebp/              # WebPライブラリ
-│   └── libavif/              # AVIFライブラリ
-├── golang/                   # Goバインディング
-│   ├── common.go             # 共通型・ユーティリティ
-│   ├── webp.go               # WebP Go API
-│   ├── avif.go               # AVIF Go API
-│   ├── avif_convert.go       # AVIF変換機能
-│   └── *_test.go             # テスト
-├── SPEC.md                   # 詳細仕様
-├── COMPAT.md                 # 互換性ドキュメント
-├── DEPENDENCIES.txt          # 部品表
-└── LICENSE                   # MITライセンス
+```bash
+cd typescript
+npm install
+npm test
 ```
 
-## ドキュメント
+すべてのテストは公式CLIツールとバイト単位で完全一致することを検証します。
 
-- [README.md](README.md) - 英語版README
-- [SPEC.md](SPEC.md) - 包括的な仕様と開発計画
-- [COMPAT.md](COMPAT.md) - cwebp/dwebp/avifenc/avifdec互換性ドキュメント
-- [DEPENDENCIES.txt](DEPENDENCIES.txt) - 全依存関係の部品表
+## CLIツール互換性
+
+このライブラリは公式CLIツールと**バイト単位で完全一致**する出力を生成します：
+
+- ✅ `cwebp` / `dwebp` - WebPエンコード/デコード
+- ✅ `avifenc` / `avifdec` - AVIFエンコード/デコード
+- ✅ `gif2webp` / `webp2gif` - GIF変換
 
 ## ライセンス
 
-このプロジェクトはMITライセンスの下でライセンスされています。詳細は[LICENSE](LICENSE)ファイルをご覧ください。
+このプロジェクトはBSD 3-Clause Licenseでライセンスされています。
+
+- libwebp: BSD License
+- libavif: BSD License
+- libaom: BSD License
+
+## ドキュメント
+
+- [TypeScript/Node.jsドキュメント](typescript/README.md)
+- [サンプル](examples/)
+- [英語版README](README.md)
+
+## コントリビューション
+
+コントリビューションを歓迎します！プルリクエストを送る前にすべてのテストが通ることを確認してください。
+
+## サポート
+
+- Issues: https://github.com/ideamans/libnextimage/issues
+- Releases: https://github.com/ideamans/libnextimage/releases
 
 ## クレジット
 
 開発: [株式会社アイデアマンズ](https://www.ideamans.com/)
-
-以下のライブラリを使用:
-- [libwebp](https://github.com/webmproject/libwebp)
-- [libavif](https://github.com/AOMediaCodec/libavif)
