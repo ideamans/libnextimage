@@ -9,9 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/ideamans/libnextimage/golang/cwebp"
-	"github.com/ideamans/libnextimage/golang/dwebp"
 )
 
 // テスト用のベースディレクトリ
@@ -80,9 +77,9 @@ func runCWebP(t *testing.T, inputFile string, args []string, outputFile string) 
 	return data
 }
 
-// WebPEncodeOptionsをcwebp.Optionsに変換
-func convertToCWebPOptions(opts WebPEncodeOptions) cwebp.Options {
-	return cwebp.Options{
+// WebPEncodeOptionsをCWebPOptionsに変換
+func convertToCWebPOptions(opts WebPEncodeOptions) CWebPOptions {
+	return CWebPOptions{
 		Quality:          opts.Quality,
 		Lossless:         opts.Lossless,
 		Method:           opts.Method,
@@ -133,7 +130,7 @@ func encodeWithLibrary(t *testing.T, inputFile string, opts WebPEncodeOptions) [
 	cwebpOpts := convertToCWebPOptions(opts)
 
 	// コマンドを作成
-	cmd, err := cwebp.NewCommand(&cwebpOpts)
+	cmd, err := NewCWebPCommand(&cwebpOpts)
 	if err != nil {
 		t.Fatalf("Failed to create cwebp command: %v", err)
 	}
@@ -227,9 +224,9 @@ func decodePNGToRGBA(filePath string) ([]byte, int, int, error) {
 	return rgba.Pix, width, height, nil
 }
 
-// WebPDecodeOptionsをdwebp.Optionsに変換
-func convertToDWebPOptions(opts WebPDecodeOptions) dwebp.Options {
-	return dwebp.Options{
+// WebPDecodeOptionsをDWebPOptionsに変換
+func convertToDWebPOptions(opts WebPDecodeOptions) DWebPOptions {
+	return DWebPOptions{
 		Format:            formatToString(opts.Format),
 		BypassFiltering:   opts.BypassFiltering,
 		NoFancyUpsampling: opts.NoFancyUpsampling,
@@ -271,7 +268,7 @@ func decodeWithLibraryToFile(t *testing.T, webpFile string, pngFile string, opts
 	dwebpOpts := convertToDWebPOptions(opts)
 
 	// コマンドを作成
-	cmd, err := dwebp.NewCommand(&dwebpOpts)
+	cmd, err := NewDWebPCommand(&dwebpOpts)
 	if err != nil {
 		t.Fatalf("Failed to create dwebp command: %v", err)
 	}

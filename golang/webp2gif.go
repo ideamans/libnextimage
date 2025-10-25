@@ -1,7 +1,7 @@
-package webp2gif
+package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../shared/include
+#cgo CFLAGS: -I${SRCDIR}/shared/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -14,11 +14,11 @@ package webp2gif
 // - math library: mathematical functions
 
 // Platform-specific embedded static libraries (shared across all golang modules)
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-arm64/libnextimage.a
-#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-amd64/libnextimage.a
-#cgo linux,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-amd64/libnextimage.a
-#cgo linux,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-arm64/libnextimage.a
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/windows-amd64/libnextimage.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-arm64/libnextimage.a
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-amd64/libnextimage.a
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/shared/lib/linux-amd64/libnextimage.a
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/shared/lib/linux-arm64/libnextimage.a
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/shared/lib/windows-amd64/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
@@ -45,30 +45,30 @@ import (
 
 // Options represents WebP to GIF conversion options.
 // Currently minimal options - reserved for future extensions.
-type Options struct {
+type WebP2GifOptions struct {
 	Reserved int // reserved for future use
 }
 
 // Command represents a webp2gif command instance that can be reused for multiple conversions.
-type Command struct {
+type WebP2GifCommand struct {
 	cmd *C.WebP2GifCommand
 }
 
 // NewDefaultOptions creates default WebP to GIF conversion options.
-func NewDefaultOptions() Options {
+func NewDefaultWebP2GifOptions() WebP2GifOptions {
 	cOpts := C.webp2gif_create_default_options()
 	if cOpts == nil {
-		return Options{Reserved: 0}
+		return WebP2GifOptions{Reserved: 0}
 	}
 	defer C.webp2gif_free_options(cOpts)
 
-	return Options{
+	return WebP2GifOptions{
 		Reserved: int(cOpts.reserved),
 	}
 }
 
 // optionsToCOptions converts Go Options to C WebP2GifOptions
-func optionsToCOptions(opts Options) *C.WebP2GifOptions {
+func webp2gifOptionsToCOptions(opts WebP2GifOptions) *C.WebP2GifOptions {
 	cOpts := C.webp2gif_create_default_options()
 	if cOpts == nil {
 		return nil
@@ -82,10 +82,10 @@ func optionsToCOptions(opts Options) *C.WebP2GifOptions {
 // NewCommand creates a new webp2gif command with the given options.
 // If opts is nil, default options are used.
 // The returned Command must be closed with Close() when done.
-func NewCommand(opts *Options) (*Command, error) {
+func NewWebP2GifCommand(opts *WebP2GifOptions) (*WebP2GifCommand, error) {
 	var cOpts *C.WebP2GifOptions
 	if opts != nil {
-		cOpts = optionsToCOptions(*opts)
+		cOpts = webp2gifOptionsToCOptions(*opts)
 		if cOpts == nil {
 			return nil, fmt.Errorf("failed to create options")
 		}
@@ -101,8 +101,8 @@ func NewCommand(opts *Options) (*Command, error) {
 		return nil, fmt.Errorf("failed to create webp2gif command: %s", C.GoString(errMsg))
 	}
 
-	cmd := &Command{cmd: cCmd}
-	runtime.SetFinalizer(cmd, func(c *Command) {
+	cmd := &WebP2GifCommand{cmd: cCmd}
+	runtime.SetFinalizer(cmd, func(c *WebP2GifCommand) {
 		_ = c.Close()
 	})
 	return cmd, nil
@@ -110,7 +110,7 @@ func NewCommand(opts *Options) (*Command, error) {
 
 // Run converts WebP data to GIF format.
 // This is the core method that performs the conversion.
-func (c *Command) Run(webpData []byte) ([]byte, error) {
+func (c *WebP2GifCommand) Run(webpData []byte) ([]byte, error) {
 	if c.cmd == nil {
 		return nil, fmt.Errorf("command is closed")
 	}
@@ -144,7 +144,7 @@ func (c *Command) Run(webpData []byte) ([]byte, error) {
 
 // RunFile reads a WebP file, converts it to GIF, and writes the result to outputPath.
 // This is sugar syntax over Run().
-func (c *Command) RunFile(inputPath, outputPath string) error {
+func (c *WebP2GifCommand) RunFile(inputPath, outputPath string) error {
 	if c.cmd == nil {
 		return fmt.Errorf("command is closed")
 	}
@@ -168,7 +168,7 @@ func (c *Command) RunFile(inputPath, outputPath string) error {
 
 // RunIO reads WebP data from input, converts it to GIF, and writes the result to output.
 // This is sugar syntax over Run().
-func (c *Command) RunIO(input io.Reader, output io.Writer) error {
+func (c *WebP2GifCommand) RunIO(input io.Reader, output io.Writer) error {
 	if c.cmd == nil {
 		return fmt.Errorf("command is closed")
 	}
@@ -192,7 +192,7 @@ func (c *Command) RunIO(input io.Reader, output io.Writer) error {
 
 // Close releases the resources associated with the command.
 // After calling Close, the command cannot be used anymore.
-func (c *Command) Close() error {
+func (c *WebP2GifCommand) Close() error {
 	if c.cmd != nil {
 		C.webp2gif_free_command(c.cmd)
 		c.cmd = nil

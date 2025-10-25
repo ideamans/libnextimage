@@ -7,8 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ideamans/libnextimage/golang/avifenc"
-	"github.com/ideamans/libnextimage/golang/cwebp"
+	libnextimage "github.com/ideamans/libnextimage/golang"
 )
 
 func main() {
@@ -161,9 +160,9 @@ func convertFile(index, total int, inputPath, outputDir, format string) Conversi
 	var outputData []byte
 	switch format {
 	case "webp":
-		opts := cwebp.NewDefaultOptions()
+		opts := libnextimage.NewDefaultCWebPOptions()
 		opts.Quality = 80
-		cmd, cmdErr := cwebp.NewCommand(&opts)
+		cmd, cmdErr := libnextimage.NewCWebPCommand(&opts)
 		if cmdErr != nil {
 			result.Error = cmdErr
 			return result
@@ -171,10 +170,10 @@ func convertFile(index, total int, inputPath, outputDir, format string) Conversi
 		defer cmd.Close()
 		outputData, err = cmd.Run(inputData)
 	case "avif":
-		opts := avifenc.NewDefaultOptions()
+		opts := libnextimage.NewDefaultAVIFEncOptions()
 		opts.Quality = 60
 		opts.Speed = 6
-		cmd, cmdErr := avifenc.NewCommand(&opts)
+		cmd, cmdErr := libnextimage.NewAVIFEncCommand(&opts)
 		if cmdErr != nil {
 			result.Error = cmdErr
 			return result

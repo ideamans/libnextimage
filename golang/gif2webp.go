@@ -1,9 +1,7 @@
-// Package cwebp provides a Go interface to the cwebp command (JPEG/PNG to WebP conversion)
-// following the SPEC.md specification.
-package cwebp
+package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../shared/include
+#cgo CFLAGS: -I${SRCDIR}/shared/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -16,11 +14,11 @@ package cwebp
 // - math library: mathematical functions
 
 // Platform-specific embedded static libraries (shared across all golang modules)
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-arm64/libnextimage.a
-#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-amd64/libnextimage.a
-#cgo linux,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-amd64/libnextimage.a
-#cgo linux,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-arm64/libnextimage.a
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/windows-amd64/libnextimage.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-arm64/libnextimage.a
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-amd64/libnextimage.a
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/shared/lib/linux-amd64/libnextimage.a
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/shared/lib/linux-arm64/libnextimage.a
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/shared/lib/windows-amd64/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
@@ -34,7 +32,7 @@ package cwebp
 #include <stdlib.h>
 #include <string.h>
 #include "nextimage.h"
-#include "nextimage/cwebp.h"
+#include "nextimage/gif2webp.h"
 */
 import "C"
 import (
@@ -45,42 +43,12 @@ import (
 	"unsafe"
 )
 
-// Preset types (matches CWebPPreset)
-const (
-	PresetDefault = 0 // default preset
-	PresetPicture = 1 // digital picture, like portrait
-	PresetPhoto   = 2 // outdoor photograph
-	PresetDrawing = 3 // hand or line drawing
-	PresetIcon    = 4 // small-sized colorful images
-	PresetText    = 5 // text-like
-)
-
-// Image hint types (matches CWebPImageHint)
-const (
-	HintDefault = 0 // default hint
-	HintPicture = 1 // digital picture, like portrait
-	HintPhoto   = 2 // outdoor photograph
-	HintGraph   = 3 // discrete tone image (graph, map-tile)
-)
-
-// Metadata flags (can be combined with bitwise OR)
-const (
-	MetadataNone = 0 // No metadata
-	MetadataEXIF = 1 // Keep EXIF metadata (1 << 0)
-	MetadataICC  = 2 // Keep ICC profile (1 << 1)
-	MetadataXMP  = 4 // Keep XMP metadata (1 << 2)
-	MetadataAll  = 7 // Keep all metadata (EXIF | ICC | XMP)
-)
-
-// Options represents WebP encoding options.
-// This corresponds to CWebPOptions in C.
-type Options struct {
+// Options represents GIF to WebP encoding options.
+// This corresponds to Gif2WebPOptions (which is typedef of CWebPOptions) in C.
+type Gif2WebPOptions struct {
 	Quality          float32
 	Lossless         bool
 	Method           int
-	Preset           int // Preset type: -1=none (default), or PresetDefault/PresetPicture/PresetPhoto/PresetDrawing/PresetIcon/PresetText
-	ImageHint        int // Image type hint: HintDefault/HintPicture/HintPhoto/HintGraph
-	LosslessPreset   int // Lossless preset: -1=don't use (default), 0-9=use preset (0=fast, 9=best)
 	TargetSize       int
 	TargetPSNR       float32
 	Segments         int
@@ -104,33 +72,25 @@ type Options struct {
 	Exact            bool
 	UseDeltaPalette  bool
 	UseSharpYUV      bool
-	QMin             int // Minimum permissible quality (0-100), default 0
-	QMax             int // Maximum permissible quality (0-100), default 100
-
-	// Metadata settings
-	KeepMetadata int // Bitwise OR of MetadataEXIF, MetadataICC, MetadataXMP (e.g., MetadataEXIF | MetadataXMP)
 }
 
-// Command represents a cwebp command instance that can be reused for multiple conversions.
-type Command struct {
-	cmd *C.CWebPCommand
+// Command represents a gif2webp command instance that can be reused for multiple conversions.
+type Gif2WebPCommand struct {
+	cmd *C.Gif2WebPCommand
 }
 
-// NewDefaultOptions creates default WebP encoding options.
-func NewDefaultOptions() Options {
-	cOpts := C.cwebp_create_default_options()
+// NewDefaultOptions creates default GIF to WebP encoding options.
+func NewDefaultGif2WebPOptions() Gif2WebPOptions {
+	cOpts := C.gif2webp_create_default_options()
 	if cOpts == nil {
-		return Options{Quality: 75, Method: 4, Preset: -1, LosslessPreset: -1, QMax: 100} // fallback defaults
+		return Gif2WebPOptions{Quality: 75, Method: 4} // fallback defaults
 	}
-	defer C.cwebp_free_options(cOpts)
+	defer C.gif2webp_free_options(cOpts)
 
-	return Options{
+	return Gif2WebPOptions{
 		Quality:          float32(cOpts.quality),
 		Lossless:         cOpts.lossless != 0,
 		Method:           int(cOpts.method),
-		Preset:           int(cOpts.preset),
-		ImageHint:        int(cOpts.image_hint),
-		LosslessPreset:   int(cOpts.lossless_preset),
 		TargetSize:       int(cOpts.target_size),
 		TargetPSNR:       float32(cOpts.target_psnr),
 		Segments:         int(cOpts.segments),
@@ -154,15 +114,12 @@ func NewDefaultOptions() Options {
 		Exact:            cOpts.exact != 0,
 		UseDeltaPalette:  cOpts.use_delta_palette != 0,
 		UseSharpYUV:      cOpts.use_sharp_yuv != 0,
-		QMin:             int(cOpts.qmin),
-		QMax:             int(cOpts.qmax),
-		KeepMetadata:     int(cOpts.keep_metadata),
 	}
 }
 
-// optionsToCOptions converts Go Options to C CWebPOptions
-func optionsToCOptions(opts Options) *C.CWebPOptions {
-	cOpts := C.cwebp_create_default_options()
+// optionsToCOptions converts Go Options to C Gif2WebPOptions
+func gif2webpOptionsToCOptions(opts Gif2WebPOptions) *C.Gif2WebPOptions {
+	cOpts := C.gif2webp_create_default_options()
 	if cOpts == nil {
 		return nil
 	}
@@ -174,9 +131,6 @@ func optionsToCOptions(opts Options) *C.CWebPOptions {
 		cOpts.lossless = 0
 	}
 	cOpts.method = C.int(opts.Method)
-	cOpts.preset = C.CWebPPreset(opts.Preset)
-	cOpts.image_hint = C.CWebPImageHint(opts.ImageHint)
-	cOpts.lossless_preset = C.int(opts.LosslessPreset)
 	cOpts.target_size = C.int(opts.TargetSize)
 	cOpts.target_psnr = C.float(opts.TargetPSNR)
 	cOpts.segments = C.int(opts.Segments)
@@ -228,137 +182,126 @@ func optionsToCOptions(opts Options) *C.CWebPOptions {
 	} else {
 		cOpts.use_sharp_yuv = 0
 	}
-	cOpts.qmin = C.int(opts.QMin)
-	cOpts.qmax = C.int(opts.QMax)
-
-	// Metadata settings
-	cOpts.keep_metadata = C.int(opts.KeepMetadata)
 
 	return cOpts
 }
 
-// NewCommand creates a new cwebp command with the given options.
+// NewCommand creates a new gif2webp command with the given options.
 // If opts is nil, default options are used.
-func NewCommand(opts *Options) (*Command, error) {
-	var cOpts *C.CWebPOptions
+// The returned Command must be closed with Close() when done.
+func NewGif2WebPCommand(opts *Gif2WebPOptions) (*Gif2WebPCommand, error) {
+	var cOpts *C.Gif2WebPOptions
 	if opts != nil {
-		cOpts = optionsToCOptions(*opts)
-	} else {
-		cOpts = nil
+		cOpts = gif2webpOptionsToCOptions(*opts)
+		if cOpts == nil {
+			return nil, fmt.Errorf("failed to create options")
+		}
 	}
 
-	cCmd := C.cwebp_new_command(cOpts)
-
+	cCmd := C.gif2webp_new_command(cOpts)
 	if cOpts != nil {
-		C.cwebp_free_options(cOpts)
+		C.gif2webp_free_options(cOpts)
 	}
 
 	if cCmd == nil {
 		errMsg := C.nextimage_last_error_message()
-		if errMsg != nil {
-			return nil, fmt.Errorf("failed to create cwebp command: %s", C.GoString(errMsg))
-		}
-		return nil, fmt.Errorf("failed to create cwebp command")
+		return nil, fmt.Errorf("failed to create gif2webp command: %s", C.GoString(errMsg))
 	}
 
-	cmd := &Command{cmd: cCmd}
-	runtime.SetFinalizer(cmd, func(c *Command) {
+	cmd := &Gif2WebPCommand{cmd: cCmd}
+	runtime.SetFinalizer(cmd, func(c *Gif2WebPCommand) {
 		_ = c.Close()
 	})
 	return cmd, nil
 }
 
-// Run converts image data (JPEG/PNG) to WebP format.
-// This is the core method that operates on byte slices.
-func (c *Command) Run(imageData []byte) ([]byte, error) {
+// Run converts GIF data to WebP format.
+// This is the core method that performs the conversion.
+func (c *Gif2WebPCommand) Run(gifData []byte) ([]byte, error) {
 	if c.cmd == nil {
 		return nil, fmt.Errorf("command is closed")
 	}
-
-	if len(imageData) == 0 {
-		return nil, fmt.Errorf("empty input data")
+	if len(gifData) == 0 {
+		return nil, fmt.Errorf("input data is empty")
 	}
 
 	var output C.NextImageBuffer
 	C.memset(unsafe.Pointer(&output), 0, C.sizeof_NextImageBuffer)
 
-	status := C.cwebp_run_command(
+	status := C.gif2webp_run_command(
 		c.cmd,
-		(*C.uint8_t)(unsafe.Pointer(&imageData[0])),
-		C.size_t(len(imageData)),
+		(*C.uint8_t)(unsafe.Pointer(&gifData[0])),
+		C.size_t(len(gifData)),
 		&output,
 	)
 
 	if status != C.NEXTIMAGE_OK {
 		errMsg := C.nextimage_last_error_message()
-		if errMsg != nil {
-			return nil, fmt.Errorf("cwebp encoding failed: %s", C.GoString(errMsg))
-		}
-		return nil, fmt.Errorf("cwebp encoding failed with status %d", int(status))
+		return nil, fmt.Errorf("gif2webp encoding failed (status %d): %s", status, C.GoString(errMsg))
 	}
 
-	// Copy data to Go slice
+	if output.data == nil || output.size == 0 {
+		return nil, fmt.Errorf("encoding produced empty output")
+	}
+
 	result := C.GoBytes(unsafe.Pointer(output.data), C.int(output.size))
-
-	// Free C buffer
 	C.nextimage_free_buffer(&output)
-
 	return result, nil
 }
 
-// RunFile converts an image file to WebP format and saves it to outputPath.
-// This is a convenience method for file-based operations.
-func (c *Command) RunFile(inputPath, outputPath string) error {
-	// Read input file
+// RunFile reads a GIF file, converts it to WebP, and writes the result to outputPath.
+// This is sugar syntax over Run().
+func (c *Gif2WebPCommand) RunFile(inputPath, outputPath string) error {
+	if c.cmd == nil {
+		return fmt.Errorf("command is closed")
+	}
+
 	inputData, err := os.ReadFile(inputPath)
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %w", err)
 	}
 
-	// Convert
 	webpData, err := c.Run(inputData)
 	if err != nil {
 		return err
 	}
 
-	// Write output file
-	err = os.WriteFile(outputPath, webpData, 0644)
-	if err != nil {
+	if err := os.WriteFile(outputPath, webpData, 0644); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
 
 	return nil
 }
 
-// RunIO converts image data from a reader to WebP format and writes to a writer.
-// This is a convenience method for stream-based operations.
-func (c *Command) RunIO(input io.Reader, output io.Writer) error {
-	// Read all input
+// RunIO reads GIF data from input, converts it to WebP, and writes the result to output.
+// This is sugar syntax over Run().
+func (c *Gif2WebPCommand) RunIO(input io.Reader, output io.Writer) error {
+	if c.cmd == nil {
+		return fmt.Errorf("command is closed")
+	}
+
 	inputData, err := io.ReadAll(input)
 	if err != nil {
 		return fmt.Errorf("failed to read input: %w", err)
 	}
 
-	// Convert
 	webpData, err := c.Run(inputData)
 	if err != nil {
 		return err
 	}
 
-	// Write output
-	_, err = output.Write(webpData)
-	if err != nil {
+	if _, err := output.Write(webpData); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
 	return nil
 }
 
-// Close releases the command resources.
+// Close releases the resources associated with the command.
 // After calling Close, the command cannot be used anymore.
-func (c *Command) Close() error {
+func (c *Gif2WebPCommand) Close() error {
 	if c.cmd != nil {
-		C.cwebp_free_command(c.cmd)
+		C.gif2webp_free_command(c.cmd)
 		c.cmd = nil
 	}
 	return nil

@@ -1,7 +1,7 @@
-package avifenc
+package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../shared/include
+#cgo CFLAGS: -I${SRCDIR}/shared/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -14,11 +14,11 @@ package avifenc
 // - math library: mathematical functions
 
 // Platform-specific embedded static libraries (shared across all golang modules)
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-arm64/libnextimage.a
-#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-amd64/libnextimage.a
-#cgo linux,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-amd64/libnextimage.a
-#cgo linux,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-arm64/libnextimage.a
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/windows-amd64/libnextimage.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-arm64/libnextimage.a
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-amd64/libnextimage.a
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/shared/lib/linux-amd64/libnextimage.a
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/shared/lib/linux-arm64/libnextimage.a
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/shared/lib/windows-amd64/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
@@ -44,7 +44,7 @@ import (
 )
 
 // Options represents AVIF encoding options
-type Options struct {
+type AVIFEncOptions struct {
 	// Quality settings
 	Quality      int // 0-100, default 60 (for color/YUV)
 	QualityAlpha int // 0-100, default 100 (for alpha channel, -1=use quality)
@@ -106,16 +106,16 @@ type Options struct {
 }
 
 // Command represents an AVIF encoder command that can be reused for multiple conversions
-type Command struct {
+type AVIFEncCommand struct {
 	cmd *C.AVIFEncCommand
 }
 
 // NewDefaultOptions creates a new Options struct with default values
-func NewDefaultOptions() Options {
+func NewDefaultAVIFEncOptions() AVIFEncOptions {
 	cOpts := C.avifenc_create_default_options()
 	if cOpts == nil {
 		// Return hardcoded defaults if C function fails
-		return Options{
+		return AVIFEncOptions{
 			Quality:                 60,
 			QualityAlpha:            -1,
 			Speed:                   6,
@@ -148,7 +148,7 @@ func NewDefaultOptions() Options {
 	}
 	defer C.avifenc_free_options(cOpts)
 
-	return Options{
+	return AVIFEncOptions{
 		Quality:                 int(cOpts.quality),
 		QualityAlpha:            int(cOpts.quality_alpha),
 		Speed:                   int(cOpts.speed),
@@ -181,7 +181,7 @@ func NewDefaultOptions() Options {
 }
 
 // optionsToCOptions converts Go Options to C AVIFEncOptions
-func optionsToCOptions(opts Options) *C.AVIFEncOptions {
+func avifencOptionsToCOptions(opts AVIFEncOptions) *C.AVIFEncOptions {
 	cOpts := C.avifenc_create_default_options()
 	if cOpts == nil {
 		return nil
@@ -280,10 +280,10 @@ func optionsToCOptions(opts Options) *C.AVIFEncOptions {
 // NewCommand creates a new AVIF encoder command with the given options.
 // If opts is nil, default options are used.
 // The returned Command must be closed with Close() when done.
-func NewCommand(opts *Options) (*Command, error) {
+func NewAVIFEncCommand(opts *AVIFEncOptions) (*AVIFEncCommand, error) {
 	var cOpts *C.AVIFEncOptions
 	if opts != nil {
-		cOpts = optionsToCOptions(*opts)
+		cOpts = avifencOptionsToCOptions(*opts)
 		if cOpts == nil {
 			return nil, fmt.Errorf("failed to create options")
 		}
@@ -299,8 +299,8 @@ func NewCommand(opts *Options) (*Command, error) {
 		return nil, fmt.Errorf("failed to create avifenc command: %s", C.GoString(errMsg))
 	}
 
-	cmd := &Command{cmd: cCmd}
-	runtime.SetFinalizer(cmd, func(c *Command) {
+	cmd := &AVIFEncCommand{cmd: cCmd}
+	runtime.SetFinalizer(cmd, func(c *AVIFEncCommand) {
 		_ = c.Close()
 	})
 	return cmd, nil
@@ -308,7 +308,7 @@ func NewCommand(opts *Options) (*Command, error) {
 
 // Run converts image data (JPEG or PNG) to AVIF format.
 // This is the core method that performs the conversion.
-func (c *Command) Run(imageData []byte) ([]byte, error) {
+func (c *AVIFEncCommand) Run(imageData []byte) ([]byte, error) {
 	if c.cmd == nil {
 		return nil, fmt.Errorf("command is closed")
 	}
@@ -342,7 +342,7 @@ func (c *Command) Run(imageData []byte) ([]byte, error) {
 
 // RunFile reads an image file, converts it to AVIF, and writes the result to outputPath.
 // This is sugar syntax over Run().
-func (c *Command) RunFile(inputPath, outputPath string) error {
+func (c *AVIFEncCommand) RunFile(inputPath, outputPath string) error {
 	if c.cmd == nil {
 		return fmt.Errorf("command is closed")
 	}
@@ -366,7 +366,7 @@ func (c *Command) RunFile(inputPath, outputPath string) error {
 
 // RunIO reads image data from input, converts it to AVIF, and writes the result to output.
 // This is sugar syntax over Run().
-func (c *Command) RunIO(input io.Reader, output io.Writer) error {
+func (c *AVIFEncCommand) RunIO(input io.Reader, output io.Writer) error {
 	if c.cmd == nil {
 		return fmt.Errorf("command is closed")
 	}
@@ -390,7 +390,7 @@ func (c *Command) RunIO(input io.Reader, output io.Writer) error {
 
 // Close releases the resources associated with the command.
 // After calling Close, the command cannot be used anymore.
-func (c *Command) Close() error {
+func (c *AVIFEncCommand) Close() error {
 	if c.cmd != nil {
 		C.avifenc_free_command(c.cmd)
 		c.cmd = nil

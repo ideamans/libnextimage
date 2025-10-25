@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/ideamans/libnextimage/golang/avifenc"
 )
 
 // setupAVIFCompatTest ensures avifenc/avifdec are available
@@ -1243,9 +1241,9 @@ func TestCompat_AVIF_DecodeStrictFlags(t *testing.T) {
 // - TargetSize is implemented in avifenc as a multi-pass encoding loop, not a direct libavif API
 // These features are available in the library API but cannot be easily tested against avifenc
 
-// convertToAVIFEncOptions converts AVIFEncodeOptions to avifenc.Options
-func convertToAVIFEncOptions(opts AVIFEncodeOptions) avifenc.Options {
-	return avifenc.Options{
+// convertToAVIFEncOptions converts AVIFEncodeOptions to AVIFEncOptions
+func convertToAVIFEncOptions(opts AVIFEncodeOptions) AVIFEncOptions {
+	return AVIFEncOptions{
 		Quality:                 opts.Quality,
 		QualityAlpha:            opts.QualityAlpha,
 		Speed:                   opts.Speed,
@@ -1286,7 +1284,7 @@ func encodeAVIFWithLibrary(inputPath string, opts AVIFEncodeOptions) ([]byte, er
 	avifencOpts := convertToAVIFEncOptions(opts)
 
 	// Create command
-	cmd, err := avifenc.NewCommand(&avifencOpts)
+	cmd, err := NewAVIFEncCommand(&avifencOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create avifenc command: %w", err)
 	}

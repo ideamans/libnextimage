@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ideamans/libnextimage/golang/avifenc"
+	libnextimage "github.com/ideamans/libnextimage/golang"
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 	fmt.Printf("Input file size: %d bytes (%.2f KB)\n", len(inputData), float64(len(inputData))/1024)
 
 	// Configure AVIF encoding options
-	opts := avifenc.NewDefaultOptions()
+	opts := libnextimage.NewDefaultAVIFEncOptions()
 
 	// Parse quality setting
 	if len(os.Args) > 3 {
@@ -62,7 +62,7 @@ func main() {
 	fmt.Printf("  Speed: %d (0=slowest, 10=fastest)\n", opts.Speed)
 
 	// Create avifenc command
-	cmd, err := avifenc.NewCommand(&opts)
+	cmd, err := libnextimage.NewAVIFEncCommand(&opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating avifenc command: %v\n", err)
 		os.Exit(1)
