@@ -397,11 +397,19 @@ install(CODE "
         message(STATUS \"Skipping libimageioutil.a (not built)\")
     endif()
 
-    # Add system libraries (jpeg, png, gif)
-    # Note: zlib is excluded because on macOS it's a .tbd file (dynamic library stub)
-    # and cannot be statically linked. It must be linked with -lz at Go build time.
+    # Add system libraries (jpeg, png, z, gif)
     list(APPEND LIBS_TO_COMBINE \"${JPEG_LIBRARY}\")
     list(APPEND LIBS_TO_COMBINE \"${PNG_LIBRARY}\")
+
+    # Add zlib if it's a static library (not .tbd or .dylib)
+    # Check if Z_LIBRARY is a static archive
+    if(EXISTS \"${Z_LIBRARY}\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.tbd$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.dylib$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.so\")
+        list(APPEND LIBS_TO_COMBINE \"${Z_LIBRARY}\")
+        message(STATUS \"Including zlib: ${Z_LIBRARY}\")
+    else()
+        message(STATUS \"Skipping zlib (not a static library): ${Z_LIBRARY}\")
+        message(STATUS \"Note: zlib must be linked separately with -lz\")
+    endif()
 
     # Add giflib if it was found during configuration
     # Use the GIF_LIBRARY variable that was already found earlier
