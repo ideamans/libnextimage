@@ -276,26 +276,36 @@ target_link_libraries(nextimage_shared PUBLIC webp webpdemux libwebpmux sharpyuv
 target_link_libraries(nextimage PUBLIC ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
 
 # 動的ライブラリのシステムライブラリリンク
-# Linux: 共有ライブラリには動的ライブラリをリンク（-fPIC問題回避）
-# macOS: 静的ライブラリで問題なし
-if(UNIX AND NOT APPLE)
-    # Linux: 動的ライブラリを使用
-    target_link_libraries(nextimage_shared PRIVATE jpeg png z)
-else()
-    # macOS/Windows: 静的ライブラリを使用
-    target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
-endif()
+# すべてのプラットフォームで静的ライブラリを使用して依存関係を組み込む
+target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
 
-# macOS/Linux: リンカーに静的ライブラリを強制的に埋め込む
-if(UNIX)
-    # -Wl,--whole-archive は Linux で依存ライブラリ全体を含める
-    # macOS では -Wl,-all_load を使用
-    if(APPLE)
-        # macOS: 動的ライブラリに静的ライブラリの内容を埋め込む
-        target_link_options(nextimage_shared PRIVATE -Wl,-all_load)
-    else()
-        # Linux: 動的ライブラリに静的ライブラリの内容を埋め込む
-        target_link_options(nextimage_shared PRIVATE -Wl,--exclude-libs,ALL)
+# プラットフォーム別リンカーオプション: 静的ライブラリを強制的に埋め込む
+if(APPLE)
+    # macOS: 動的ライブラリに静的ライブラリの内容を埋め込む
+    target_link_options(nextimage_shared PRIVATE -Wl,-all_load)
+elseif(UNIX)
+    # Linux: 静的ライブラリのシンボルを完全に組み込み、外部シンボルは隠す
+    target_link_options(nextimage_shared PRIVATE
+        -Wl,--exclude-libs,ALL
+        -static-libgcc
+        -static-libstdc++
+    )
+    # 位置独立コード（PIC）を有効化
+    set_target_properties(nextimage_shared PROPERTIES POSITION_INDEPENDENT_CODE ON)
+elseif(WIN32)
+    # Windows: 静的ライブラリを使用（デフォルトで組み込まれる）
+    # MSVC: /MT フラグで静的ランタイムを使用
+    if(MSVC)
+        set_target_properties(nextimage_shared PROPERTIES
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        )
+    endif()
+    # MinGW: 静的リンクオプション
+    if(MINGW)
+        target_link_options(nextimage_shared PRIVATE
+            -static-libgcc
+            -static-libstdc++
+        )
     endif()
 endif()
 
@@ -303,12 +313,8 @@ endif()
 if(GIF_LIBRARY)
     target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
 
-    # 共有ライブラリ向け: Linux は動的、それ以外は静的
-    if(UNIX AND NOT APPLE)
-        target_link_libraries(nextimage_shared PRIVATE gif)
-    else()
-        target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
-    endif()
+    # 共有ライブラリ向け: すべてのプラットフォームで静的ライブラリを使用
+    target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
 endif()
 
 # コンパイラ警告の有効化
