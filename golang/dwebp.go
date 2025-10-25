@@ -1,9 +1,9 @@
 // Package dwebp provides a Go interface to the dwebp command (WebP to PNG conversion)
 // following the SPEC.md specification.
-package dwebp
+package libnextimage
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../shared/include
+#cgo CFLAGS: -I${SRCDIR}/shared/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -16,11 +16,11 @@ package dwebp
 // - math library: mathematical functions
 
 // Platform-specific embedded static libraries (shared across all golang modules)
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-arm64/libnextimage.a
-#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-amd64/libnextimage.a
-#cgo linux,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-amd64/libnextimage.a
-#cgo linux,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-arm64/libnextimage.a
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/windows-amd64/libnextimage.a
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-arm64/libnextimage.a
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/shared/lib/darwin-amd64/libnextimage.a
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/shared/lib/linux-amd64/libnextimage.a
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/shared/lib/linux-arm64/libnextimage.a
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/shared/lib/windows-amd64/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
@@ -45,17 +45,9 @@ import (
 	"unsafe"
 )
 
-// OutputFormat represents the output format for decoded images
-type OutputFormat int
-
-const (
-	OutputPNG  OutputFormat = 0 // PNG output (default)
-	OutputJPEG OutputFormat = 1 // JPEG output
-)
-
-// Options represents WebP decoding options.
+// DWebPOptions represents WebP decoding options.
 // This corresponds to DWebPOptions in C.
-type Options struct {
+type DWebPOptions struct {
 	OutputFormat      OutputFormat // PNG or JPEG output (default: PNG)
 	JPEGQuality       int          // JPEG quality 0-100 (default: 90, only for JPEG output)
 	Format            string       // "RGBA", "RGB", "BGRA"
@@ -78,15 +70,15 @@ type Options struct {
 }
 
 // Command represents a dwebp command instance that can be reused for multiple conversions.
-type Command struct {
+type DWebPCommand struct {
 	cmd *C.DWebPCommand
 }
 
 // NewDefaultOptions creates default WebP decoding options.
-func NewDefaultOptions() Options {
+func NewDefaultDWebPOptions() DWebPOptions {
 	cOpts := C.dwebp_create_default_options()
 	if cOpts == nil {
-		return Options{
+		return DWebPOptions{
 			OutputFormat: OutputPNG,
 			JPEGQuality:  90,
 			Format:       "RGBA",
@@ -102,7 +94,7 @@ func NewDefaultOptions() Options {
 		format = "BGRA"
 	}
 
-	return Options{
+	return DWebPOptions{
 		OutputFormat:      OutputFormat(cOpts.output_format),
 		JPEGQuality:       int(cOpts.jpeg_quality),
 		Format:            format,
@@ -122,7 +114,7 @@ func NewDefaultOptions() Options {
 }
 
 // optionsToCOptions converts Go Options to C DWebPOptions
-func optionsToCOptions(opts Options) *C.DWebPOptions {
+func dwebpOptionsToCOptions(opts DWebPOptions) *C.DWebPOptions {
 	cOpts := C.dwebp_create_default_options()
 	if cOpts == nil {
 		return nil
@@ -189,10 +181,10 @@ func optionsToCOptions(opts Options) *C.DWebPOptions {
 
 // NewCommand creates a new dwebp command with the given options.
 // If opts is nil, default options are used.
-func NewCommand(opts *Options) (*Command, error) {
+func NewDWebPCommand(opts *DWebPOptions) (*DWebPCommand, error) {
 	var cOpts *C.DWebPOptions
 	if opts != nil {
-		cOpts = optionsToCOptions(*opts)
+		cOpts = dwebpOptionsToCOptions(*opts)
 	} else {
 		cOpts = nil
 	}
@@ -211,8 +203,8 @@ func NewCommand(opts *Options) (*Command, error) {
 		return nil, fmt.Errorf("failed to create dwebp command")
 	}
 
-	cmd := &Command{cmd: cCmd}
-	runtime.SetFinalizer(cmd, func(c *Command) {
+	cmd := &DWebPCommand{cmd: cCmd}
+	runtime.SetFinalizer(cmd, func(c *DWebPCommand) {
 		_ = c.Close()
 	})
 	return cmd, nil
@@ -220,7 +212,7 @@ func NewCommand(opts *Options) (*Command, error) {
 
 // Run converts WebP data to PNG format.
 // This is the core method that operates on byte slices.
-func (c *Command) Run(webpData []byte) ([]byte, error) {
+func (c *DWebPCommand) Run(webpData []byte) ([]byte, error) {
 	if c.cmd == nil {
 		return nil, fmt.Errorf("command is closed")
 	}
@@ -258,7 +250,7 @@ func (c *Command) Run(webpData []byte) ([]byte, error) {
 
 // RunFile converts a WebP file to PNG format and saves it to outputPath.
 // This is a convenience method for file-based operations.
-func (c *Command) RunFile(inputPath, outputPath string) error {
+func (c *DWebPCommand) RunFile(inputPath, outputPath string) error {
 	// Read input file
 	inputData, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -282,7 +274,7 @@ func (c *Command) RunFile(inputPath, outputPath string) error {
 
 // RunIO converts WebP data from a reader to PNG format and writes to a writer.
 // This is a convenience method for stream-based operations.
-func (c *Command) RunIO(input io.Reader, output io.Writer) error {
+func (c *DWebPCommand) RunIO(input io.Reader, output io.Writer) error {
 	// Read all input
 	inputData, err := io.ReadAll(input)
 	if err != nil {
@@ -306,7 +298,7 @@ func (c *Command) RunIO(input io.Reader, output io.Writer) error {
 
 // Close releases the command resources.
 // After calling Close, the command cannot be used anymore.
-func (c *Command) Close() error {
+func (c *DWebPCommand) Close() error {
 	if c.cmd != nil {
 		C.dwebp_free_command(c.cmd)
 		c.cmd = nil

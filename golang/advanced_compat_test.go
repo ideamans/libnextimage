@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
-	"github.com/ideamans/libnextimage/golang/cwebp"
 )
 
 // TestCompat_WebP_Preset tests the -preset option
@@ -799,7 +797,7 @@ func webpEncodeWithLibrary(t *testing.T, inputPath string, opts WebPEncodeOption
 	cwebpOpts := convertToCWebPOptions(opts)
 
 	// コマンドを作成
-	cmd, err := cwebp.NewCommand(&cwebpOpts)
+	cmd, err := NewCWebPCommand(&cwebpOpts)
 	if err != nil {
 		t.Fatalf("Failed to create cwebp command: %v", err)
 	}

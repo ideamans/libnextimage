@@ -5,7 +5,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/ideamans/libnextimage/golang/cwebp"
+	libnextimage "github.com/ideamans/libnextimage/golang"
 )
 
 func main() {
@@ -32,7 +32,7 @@ func main() {
 	fmt.Printf("Input file size: %d bytes (%.2f KB)\n", len(inputData), float64(len(inputData))/1024)
 
 	// Configure WebP encoding options
-	opts := cwebp.NewDefaultOptions()
+	opts := libnextimage.NewDefaultCWebPOptions()
 
 	// Parse quality setting from command line
 	if len(os.Args) > 3 {
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	// Create cwebp command
-	cmd, err := cwebp.NewCommand(&opts)
+	cmd, err := libnextimage.NewCWebPCommand(&opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating cwebp command: %v\n", err)
 		os.Exit(1)
