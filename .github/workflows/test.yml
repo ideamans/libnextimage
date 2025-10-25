@@ -12,7 +12,15 @@ jobs:
     name: Build C Library (${{ matrix.os }})
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-24.04-arm64
+            arch: arm64
+          - os: macos-latest
+            arch: arm64
+          - os: windows-latest
+            arch: amd64
 
     runs-on: ${{ matrix.os }}
 
@@ -162,7 +170,15 @@ jobs:
     needs: build-c-library
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-24.04-arm64
+            arch: arm64
+          - os: macos-latest
+            arch: arm64
+          - os: windows-latest
+            arch: amd64
 
     runs-on: ${{ matrix.os }}
 
@@ -247,8 +263,19 @@ jobs:
     needs: build-c-library
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: ['22']
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+            node-version: '22'
+          - os: ubuntu-24.04-arm64
+            arch: arm64
+            node-version: '22'
+          - os: macos-latest
+            arch: arm64
+            node-version: '22'
+          - os: windows-latest
+            arch: amd64
+            node-version: '22'
 
     runs-on: ${{ matrix.os }}
 
