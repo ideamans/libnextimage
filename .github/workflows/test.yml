@@ -15,7 +15,7 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: amd64
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-24.04-arm
             arch: arm64
           - os: macos-latest
             arch: arm64
@@ -173,7 +173,7 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: amd64
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-24.04-arm
             arch: arm64
           - os: macos-latest
             arch: arm64
@@ -267,7 +267,7 @@ jobs:
           - os: ubuntu-latest
             arch: amd64
             node-version: '22'
-          - os: ubuntu-24.04-arm64
+          - os: ubuntu-24.04-arm
             arch: arm64
             node-version: '22'
           - os: macos-latest
