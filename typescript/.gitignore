@@ -7,8 +7,8 @@ dist/
 # Dependencies
 node_modules/
 
-# Downloaded libraries (npm install)
-lib/
+# Note: lib/ now contains embedded native libraries and is tracked in git
+# No longer ignored since we embed platform-specific binaries
 
 # Test output
 test-output/

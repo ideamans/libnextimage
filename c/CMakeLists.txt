@@ -414,7 +414,7 @@ install(CODE "
 
     # Add zlib if it's a static library (not .tbd or .dylib)
     # Check if Z_LIBRARY is a static archive
-    if(EXISTS \"${Z_LIBRARY}\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.tbd$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.dylib$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"\\.so\")
+    if(EXISTS \"${Z_LIBRARY}\" AND NOT \"${Z_LIBRARY}\" MATCHES \"[.]tbd$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"[.]dylib$\" AND NOT \"${Z_LIBRARY}\" MATCHES \"[.]so\")
         list(APPEND LIBS_TO_COMBINE \"${Z_LIBRARY}\")
         message(STATUS \"Including zlib: ${Z_LIBRARY}\")
     else()

@@ -56,38 +56,36 @@ jobs:
 
       - name: Extract and organize Go binaries
         run: |
-          echo "Organizing Go static libraries..."
+          echo "Organizing Go static libraries to golang/shared..."
 
-          # Go modules that need libraries
-          GO_MODULES="cwebp dwebp avifenc avifdec gif2webp webp2gif"
           PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
 
-          for MODULE in $GO_MODULES; do
-            echo "Setting up golang/$MODULE..."
+          for PLATFORM in $PLATFORMS; do
+            if [ -f "static-${PLATFORM}.tar.gz" ]; then
+              echo "Processing $PLATFORM..."
 
-            for PLATFORM in $PLATFORMS; do
-              if [ -f "static-${PLATFORM}.tar.gz" ]; then
-                # Create directory structure
-                mkdir -p "golang/$MODULE/lib/$PLATFORM"
-                mkdir -p "golang/$MODULE/include"
+              # Create directory structure
+              mkdir -p "golang/shared/lib/$PLATFORM"
+              mkdir -p "golang/shared/include"
 
-                # Extract static library
-                EXTRACT_DIR="/tmp/extract-static-$PLATFORM"
-                mkdir -p "$EXTRACT_DIR"
-                tar -xzf "static-${PLATFORM}.tar.gz" -C "$EXTRACT_DIR"
+              # Extract static library
+              EXTRACT_DIR="/tmp/extract-static-$PLATFORM"
+              mkdir -p "$EXTRACT_DIR"
+              tar -xzf "static-${PLATFORM}.tar.gz" -C "$EXTRACT_DIR"
 
-                # Copy library
-                cp "$EXTRACT_DIR/lib/libnextimage.a" "golang/$MODULE/lib/$PLATFORM/"
+              # Copy library
+              cp "$EXTRACT_DIR/lib/libnextimage.a" "golang/shared/lib/$PLATFORM/"
 
-                # Copy headers (only once per module)
-                if [ ! -f "golang/$MODULE/include/nextimage.h" ]; then
-                  cp -r "$EXTRACT_DIR/include"/* "golang/$MODULE/include/"
-                fi
-
-                rm -rf "$EXTRACT_DIR"
+              # Copy headers (only once)
+              if [ ! -f "golang/shared/include/nextimage.h" ]; then
+                cp -r "$EXTRACT_DIR/include"/* "golang/shared/include/"
               fi
-            done
+
+              rm -rf "$EXTRACT_DIR"
+            fi
           done
+
+          echo "✓ All Go binaries organized in golang/shared/"
 
       - name: Extract and organize TypeScript binaries
         run: |
@@ -128,39 +126,6 @@ jobs:
           # Remove library-version.json if it exists
           rm -f library-version.json
 
-      - name: Update Go module CGO directives
-        run: |
-          # Update each Go submodule to use embedded libraries
-          GO_MODULES="cwebp dwebp avifenc avifdec gif2webp webp2gif"
-
-          for MODULE in $GO_MODULES; do
-            MODULE_FILE="golang/$MODULE/${MODULE}.go"
-
-            if [ -f "$MODULE_FILE" ]; then
-              echo "Updating CGO directives in $MODULE_FILE..."
-
-              # Backup original
-              cp "$MODULE_FILE" "$MODULE_FILE.bak"
-
-              # Update CFLAGS to use embedded include
-              sed -i 's|#cgo CFLAGS: -I\${SRCDIR}/../../include|#cgo CFLAGS: -I${SRCDIR}/include|g' "$MODULE_FILE"
-
-              # Update LDFLAGS to use platform-specific embedded library
-              # Replace the single LDFLAGS line with platform-specific ones
-              sed -i '/^#cgo LDFLAGS: \${SRCDIR}\/\.\.\/\.\.\/lib\/static\/libnextimage\.a$/d' "$MODULE_FILE"
-
-              # Add platform-specific LDFLAGS after CFLAGS line
-              sed -i '/^#cgo CFLAGS:/a\
-#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/lib/darwin-arm64/libnextimage.a\
-#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/lib/darwin-amd64/libnextimage.a\
-#cgo linux,amd64 LDFLAGS: ${SRCDIR}/lib/linux-amd64/libnextimage.a\
-#cgo linux,arm64 LDFLAGS: ${SRCDIR}/lib/linux-arm64/libnextimage.a\
-#cgo windows,amd64 LDFLAGS: ${SRCDIR}/lib/windows-amd64/libnextimage.a' "$MODULE_FILE"
-
-              rm -f "$MODULE_FILE.bak"
-            fi
-          done
-
       - name: Clean up downloaded archives
         run: |
           rm -f static-*.tar.gz shared-*.tar.gz
@@ -172,8 +137,8 @@ jobs:
           commit-message: |
             Update binaries for ${{ steps.version.outputs.tag }}
 
-            - Added prebuilt libraries for all platforms
-            - Updated Go modules to use embedded libraries
+            - Added prebuilt libraries to golang/shared/ for all platforms
+            - Added prebuilt libraries to typescript/lib/ for all platforms
             - Updated TypeScript to version ${{ steps.version.outputs.version }}
             - Removed library-version.json (no longer needed)
           branch: update-binaries-${{ steps.version.outputs.tag }}
@@ -185,8 +150,8 @@ jobs:
             This PR updates the prebuilt binaries for version `${{ steps.version.outputs.tag }}`.
 
             ### Changes:
-            - ✅ Go modules: Added static libraries for all platforms
-            - ✅ TypeScript: Added shared libraries for all platforms
+            - ✅ Go modules: Added static libraries to golang/shared/ for all platforms
+            - ✅ TypeScript: Added shared libraries to typescript/lib/ for all platforms
             - ✅ TypeScript: Updated package.json to version ${{ steps.version.outputs.version }}
             - ✅ Removed library-version.json
 

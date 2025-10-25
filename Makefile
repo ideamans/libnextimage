@@ -1,4 +1,4 @@
-.PHONY: help build-c test-c install-c clean-c test-go test-typescript test-all clean-all
+.PHONY: help build-c test-c install-c clean-c copy-libs-local test-go test-typescript test-all clean-all
 
 # Default target
 help:
@@ -48,6 +48,71 @@ install-c:
 	@echo ""
 	@echo "Header files:"
 	@ls lib/include/*.h 2>/dev/null | wc -l | xargs echo "  " "files in lib/include/" || echo "  (not found)"
+	@echo ""
+	@echo "Copying libraries to golang and typescript modules for local development..."
+	@$(MAKE) copy-libs-local
+
+copy-libs-local:
+	@echo "Detecting platform..."
+	@PLATFORM=$$(uname -s | tr '[:upper:]' '[:lower:]'); \
+	ARCH=$$(uname -m); \
+	if [ "$$PLATFORM" = "darwin" ]; then \
+		if [ "$$ARCH" = "arm64" ]; then \
+			PLATFORM_NAME="darwin-arm64"; \
+			SHARED_EXT="dylib"; \
+		else \
+			PLATFORM_NAME="darwin-amd64"; \
+			SHARED_EXT="dylib"; \
+		fi; \
+	elif [ "$$PLATFORM" = "linux" ]; then \
+		if [ "$$ARCH" = "x86_64" ]; then \
+			PLATFORM_NAME="linux-amd64"; \
+		elif [ "$$ARCH" = "aarch64" ]; then \
+			PLATFORM_NAME="linux-arm64"; \
+		else \
+			echo "Unsupported Linux architecture: $$ARCH"; \
+			exit 1; \
+		fi; \
+		SHARED_EXT="so"; \
+	elif [ "$$PLATFORM" = "mingw"* ] || [ "$$PLATFORM" = "msys"* ]; then \
+		PLATFORM_NAME="windows-amd64"; \
+		SHARED_EXT="dll"; \
+	else \
+		echo "Unsupported platform: $$PLATFORM"; \
+		exit 1; \
+	fi; \
+	echo "Platform: $$PLATFORM_NAME"; \
+	echo ""; \
+	echo "Copying to golang/shared/lib/$$PLATFORM_NAME/..."; \
+	mkdir -p golang/shared/lib/$$PLATFORM_NAME; \
+	if [ -f lib/static/libnextimage.a ]; then \
+		cp lib/static/libnextimage.a golang/shared/lib/$$PLATFORM_NAME/; \
+		ls -lh golang/shared/lib/$$PLATFORM_NAME/libnextimage.a; \
+	else \
+		echo "  Warning: lib/static/libnextimage.a not found"; \
+	fi; \
+	echo ""; \
+	echo "Copying to golang/shared/include/..."; \
+	mkdir -p golang/shared/include; \
+	if [ -d lib/include ]; then \
+		cp -r lib/include/* golang/shared/include/; \
+		echo "  Copied header files"; \
+		ls lib/include/*.h | wc -l | xargs echo "  " "files copied"; \
+	else \
+		echo "  Warning: lib/include not found"; \
+	fi; \
+	echo ""; \
+	echo "Copying to typescript/lib/$$PLATFORM_NAME/..."; \
+	mkdir -p typescript/lib/$$PLATFORM_NAME; \
+	SHARED_LIB="lib/shared/libnextimage.$$SHARED_EXT"; \
+	if [ -f "$$SHARED_LIB" ]; then \
+		cp "$$SHARED_LIB" typescript/lib/$$PLATFORM_NAME/; \
+		ls -lh typescript/lib/$$PLATFORM_NAME/libnextimage.$$SHARED_EXT; \
+	else \
+		echo "  Warning: $$SHARED_LIB not found"; \
+	fi; \
+	echo ""; \
+	echo "✓ Local libraries copied successfully"
 
 clean-c:
 	@echo "Cleaning C build artifacts..."

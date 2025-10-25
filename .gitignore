@@ -4,12 +4,20 @@
 # C Build Artifacts
 # ========================================
 *.o
+*.exe
+*.out
+
+# Ignore build artifacts except in embedded library directories
 *.a
 *.so
 *.dylib
 *.dll
-*.exe
-*.out
+
+# BUT allow embedded libraries in golang and typescript modules
+!golang/shared/lib/**/*.a
+!typescript/lib/**/*.so
+!typescript/lib/**/*.dylib
+!typescript/lib/**/*.dll
 
 # C Build Directories
 c/build/

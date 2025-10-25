@@ -3,7 +3,7 @@
 package dwebp
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../include
+#cgo CFLAGS: -I${SRCDIR}/../shared/include
 
 // libnextimage.a is a fully self-contained static library that includes:
 // - webp, avif, aom (image codecs)
@@ -15,8 +15,12 @@ package dwebp
 // - pthread: multi-threading support
 // - math library: mathematical functions
 
-// Use full path to static library to avoid linking against shared library
-#cgo LDFLAGS: ${SRCDIR}/../../lib/static/libnextimage.a
+// Platform-specific embedded static libraries (shared across all golang modules)
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-arm64/libnextimage.a
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/darwin-amd64/libnextimage.a
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-amd64/libnextimage.a
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/../shared/lib/linux-arm64/libnextimage.a
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/../shared/lib/windows-amd64/libnextimage.a
 
 // macOS
 #cgo darwin LDFLAGS: -lz -lc++ -lpthread -lm
