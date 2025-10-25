@@ -276,8 +276,15 @@ target_link_libraries(nextimage_shared PUBLIC webp webpdemux libwebpmux sharpyuv
 target_link_libraries(nextimage PUBLIC ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
 
 # 動的ライブラリのシステムライブラリリンク
-# すべてのプラットフォームで静的ライブラリを使用して依存関係を組み込む
-target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+# Linux: システムの共有ライブラリを使用（静的ライブラリはPICなしでコンパイルされている）
+# macOS/Windows: 静的ライブラリを使用可能
+if(UNIX AND NOT APPLE)
+    # Linux: 共有ライブラリを動的リンク
+    target_link_libraries(nextimage_shared PRIVATE jpeg png z)
+else()
+    # macOS/Windows: 静的ライブラリを使用
+    target_link_libraries(nextimage_shared PRIVATE ${JPEG_LIBRARY} ${PNG_LIBRARY} ${Z_LIBRARY})
+endif()
 
 # プラットフォーム別リンカーオプション: 静的ライブラリを強制的に埋め込む
 if(APPLE)
@@ -313,8 +320,12 @@ endif()
 if(GIF_LIBRARY)
     target_link_libraries(nextimage PUBLIC ${GIF_LIBRARY})
 
-    # 共有ライブラリ向け: すべてのプラットフォームで静的ライブラリを使用
-    target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
+    # 共有ライブラリ向け: Linux は動的、それ以外は静的
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(nextimage_shared PRIVATE gif)
+    else()
+        target_link_libraries(nextimage_shared PRIVATE ${GIF_LIBRARY})
+    endif()
 endif()
 
 # コンパイラ警告の有効化

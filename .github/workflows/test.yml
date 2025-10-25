@@ -269,6 +269,12 @@ jobs:
           key: c-library-${{ runner.os }}-${{ github.sha }}
           fail-on-cache-miss: true
 
+      - name: Install runtime dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgif7 libjpeg-turbo8 libpng16-16
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
