@@ -6,12 +6,6 @@ all: install test
 # Install dependencies and setup native libraries
 install:
 	@echo "Installing Go dependencies..."
-	@# For local testing, uncomment the replace directive in go.mod
-	@if ! grep -q "^replace github.com/ideamans/libnextimage/golang" go.mod; then \
-		echo "Enabling local development mode..."; \
-		sed -i.bak 's|^// replace github.com/ideamans/libnextimage/golang|replace github.com/ideamans/libnextimage/golang|' go.mod && rm -f go.mod.bak; \
-	fi
-	@# Download dependencies
 	@go mod tidy
 	@echo "✓ Installation complete"
 
@@ -74,10 +68,6 @@ test-batch:
 # Clean up
 clean:
 	@echo "Cleaning up..."
-	@# Restore go.mod to use published version
-	@if grep -q "^replace github.com/ideamans/libnextimage/golang" go.mod; then \
-		sed -i.bak 's|^replace github.com/ideamans/libnextimage/golang|// replace github.com/ideamans/libnextimage/golang|' go.mod && rm -f go.mod.bak; \
-	fi
 	@rm -rf output
 	@rm -f go.sum
 	@echo "✓ Cleanup complete"
