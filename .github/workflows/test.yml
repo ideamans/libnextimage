@@ -116,7 +116,7 @@ jobs:
             lib/
             c/build/
             testdata/
-          key: c-library-${{ runner.os }}-${{ github.sha }}
+          key: c-library-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }}
 
       - name: Dump build logs (on failure - Unix)
         if: failure() && runner.os != 'Windows'
@@ -196,7 +196,7 @@ jobs:
             lib/
             c/build/
             testdata/
-          key: c-library-${{ runner.os }}-${{ github.sha }}
+          key: c-library-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }}
           fail-on-cache-miss: true
 
       - name: Set up Go
@@ -293,7 +293,7 @@ jobs:
             lib/
             c/build/
             testdata/
-          key: c-library-${{ runner.os }}-${{ github.sha }}
+          key: c-library-${{ matrix.os }}-${{ matrix.arch }}-${{ github.sha }}
           fail-on-cache-miss: true
 
       - name: Install runtime dependencies (Linux)
