@@ -1,0 +1,201 @@
+name: Update Binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.5.0)'
+        required: true
+
+jobs:
+  update-binaries:
+    name: Update Go and TypeScript binaries
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.release.tag_name, 'v') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download release artifacts
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+
+          echo "Downloading artifacts for $TAG..."
+
+          # Download all platform artifacts
+          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+
+          for PLATFORM in $PLATFORMS; do
+            # Static library
+            STATIC_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/libnextimage-${TAG}-${PLATFORM}.tar.gz"
+            echo "Downloading $STATIC_URL"
+            curl -L -f -o "static-${PLATFORM}.tar.gz" "$STATIC_URL" || echo "Warning: Failed to download static for $PLATFORM"
+
+            # Shared library
+            SHARED_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/libnextimage-shared-${TAG}-${PLATFORM}.tar.gz"
+            echo "Downloading $SHARED_URL"
+            curl -L -f -o "shared-${PLATFORM}.tar.gz" "$SHARED_URL" || echo "Warning: Failed to download shared for $PLATFORM"
+          done
+
+      - name: Extract and organize Go binaries
+        run: |
+          echo "Organizing Go static libraries..."
+
+          # Go modules that need libraries
+          GO_MODULES="cwebp dwebp avifenc avifdec gif2webp webp2gif"
+          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+
+          for MODULE in $GO_MODULES; do
+            echo "Setting up golang/$MODULE..."
+
+            for PLATFORM in $PLATFORMS; do
+              if [ -f "static-${PLATFORM}.tar.gz" ]; then
+                # Create directory structure
+                mkdir -p "golang/$MODULE/lib/$PLATFORM"
+                mkdir -p "golang/$MODULE/include"
+
+                # Extract static library
+                EXTRACT_DIR="/tmp/extract-static-$PLATFORM"
+                mkdir -p "$EXTRACT_DIR"
+                tar -xzf "static-${PLATFORM}.tar.gz" -C "$EXTRACT_DIR"
+
+                # Copy library
+                cp "$EXTRACT_DIR/lib/libnextimage.a" "golang/$MODULE/lib/$PLATFORM/"
+
+                # Copy headers (only once per module)
+                if [ ! -f "golang/$MODULE/include/nextimage.h" ]; then
+                  cp -r "$EXTRACT_DIR/include"/* "golang/$MODULE/include/"
+                fi
+
+                rm -rf "$EXTRACT_DIR"
+              fi
+            done
+          done
+
+      - name: Extract and organize TypeScript binaries
+        run: |
+          echo "Organizing TypeScript shared libraries..."
+
+          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+
+          for PLATFORM in $PLATFORMS; do
+            if [ -f "shared-${PLATFORM}.tar.gz" ]; then
+              # Create directory structure
+              mkdir -p "typescript/lib/$PLATFORM"
+
+              # Extract shared library
+              EXTRACT_DIR="/tmp/extract-shared-$PLATFORM"
+              mkdir -p "$EXTRACT_DIR"
+              tar -xzf "shared-${PLATFORM}.tar.gz" -C "$EXTRACT_DIR"
+
+              # Copy library
+              cp "$EXTRACT_DIR/lib"/* "typescript/lib/$PLATFORM/" || true
+
+              rm -rf "$EXTRACT_DIR"
+            fi
+          done
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Update TypeScript package version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Update package.json version
+          cd typescript
+          npm version $VERSION --no-git-tag-version --allow-same-version
+
+          # Remove library-version.json if it exists
+          rm -f library-version.json
+
+      - name: Update Go module CGO directives
+        run: |
+          # Update each Go submodule to use embedded libraries
+          GO_MODULES="cwebp dwebp avifenc avifdec gif2webp webp2gif"
+
+          for MODULE in $GO_MODULES; do
+            MODULE_FILE="golang/$MODULE/${MODULE}.go"
+
+            if [ -f "$MODULE_FILE" ]; then
+              echo "Updating CGO directives in $MODULE_FILE..."
+
+              # Backup original
+              cp "$MODULE_FILE" "$MODULE_FILE.bak"
+
+              # Update CFLAGS to use embedded include
+              sed -i 's|#cgo CFLAGS: -I\${SRCDIR}/../../include|#cgo CFLAGS: -I${SRCDIR}/include|g' "$MODULE_FILE"
+
+              # Update LDFLAGS to use platform-specific embedded library
+              # Replace the single LDFLAGS line with platform-specific ones
+              sed -i '/^#cgo LDFLAGS: \${SRCDIR}\/\.\.\/\.\.\/lib\/static\/libnextimage\.a$/d' "$MODULE_FILE"
+
+              # Add platform-specific LDFLAGS after CFLAGS line
+              sed -i '/^#cgo CFLAGS:/a\
+#cgo darwin,arm64 LDFLAGS: ${SRCDIR}/lib/darwin-arm64/libnextimage.a\
+#cgo darwin,amd64 LDFLAGS: ${SRCDIR}/lib/darwin-amd64/libnextimage.a\
+#cgo linux,amd64 LDFLAGS: ${SRCDIR}/lib/linux-amd64/libnextimage.a\
+#cgo linux,arm64 LDFLAGS: ${SRCDIR}/lib/linux-arm64/libnextimage.a\
+#cgo windows,amd64 LDFLAGS: ${SRCDIR}/lib/windows-amd64/libnextimage.a' "$MODULE_FILE"
+
+              rm -f "$MODULE_FILE.bak"
+            fi
+          done
+
+      - name: Clean up downloaded archives
+        run: |
+          rm -f static-*.tar.gz shared-*.tar.gz
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            Update binaries for ${{ steps.version.outputs.tag }}
+
+            - Added prebuilt libraries for all platforms
+            - Updated Go modules to use embedded libraries
+            - Updated TypeScript to version ${{ steps.version.outputs.version }}
+            - Removed library-version.json (no longer needed)
+          branch: update-binaries-${{ steps.version.outputs.tag }}
+          delete-branch: true
+          title: 'Update binaries for ${{ steps.version.outputs.tag }}'
+          body: |
+            ## Automated Binary Update
+
+            This PR updates the prebuilt binaries for version `${{ steps.version.outputs.tag }}`.
+
+            ### Changes:
+            - ✅ Go modules: Added static libraries for all platforms
+            - ✅ TypeScript: Added shared libraries for all platforms
+            - ✅ TypeScript: Updated package.json to version ${{ steps.version.outputs.version }}
+            - ✅ Removed library-version.json
+
+            ### Next Steps:
+            1. Review and merge this PR
+            2. Tag Go modules: `git tag golang/v${{ steps.version.outputs.version }} && git push --tags`
+            3. Publish TypeScript: `cd typescript && npm publish`
+
+            **Auto-generated by release workflow**
+          labels: |
+            automated
+            release
