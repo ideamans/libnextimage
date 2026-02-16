@@ -46,7 +46,7 @@ jobs:
           echo "Downloading artifacts for $TAG..."
 
           # Download all platform artifacts with error checking
-          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+          PLATFORMS="darwin-arm64 linux-amd64 linux-arm64 windows-amd64"
           FAILED_DOWNLOADS=""
 
           for PLATFORM in $PLATFORMS; do
@@ -80,7 +80,7 @@ jobs:
         run: |
           echo "Organizing Go static libraries to golang/shared..."
 
-          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+          PLATFORMS="darwin-arm64 linux-amd64 linux-arm64 windows-amd64"
 
           for PLATFORM in $PLATFORMS; do
             if [ -f "static-${PLATFORM}.tar.gz" ]; then
@@ -113,7 +113,7 @@ jobs:
         run: |
           echo "Organizing TypeScript shared libraries..."
 
-          PLATFORMS="darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64"
+          PLATFORMS="darwin-arm64 linux-amd64 linux-arm64 windows-amd64"
 
           for PLATFORM in $PLATFORMS; do
             if [ -f "shared-${PLATFORM}.tar.gz" ]; then

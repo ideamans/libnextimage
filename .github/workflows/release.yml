@@ -15,9 +15,6 @@ jobs:
           - os: macos-latest
             platform: darwin-arm64
             arch: arm64
-          - os: macos-13
-            platform: darwin-amd64
-            arch: amd64
           - os: ubuntu-latest
             platform: linux-amd64
             arch: amd64
@@ -48,12 +45,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake build-essential libjpeg-dev libpng-dev libgif-dev nasm
 
+      - name: Setup NASM (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+
       - name: Setup MSYS2
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: true
+          path-type: inherit
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-cmake
@@ -62,7 +64,6 @@ jobs:
             mingw-w64-ucrt-x86_64-libpng
             mingw-w64-ucrt-x86_64-giflib
             mingw-w64-ucrt-x86_64-libwebp
-            mingw-w64-ucrt-x86_64-nasm
 
       - name: Build C library (Unix)
         if: runner.os != 'Windows'
