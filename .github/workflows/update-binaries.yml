@@ -23,6 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: main
           # Use PAT_TOKEN for creating PRs and triggering workflows
           # If PAT_TOKEN is not available, falls back to GITHUB_TOKEN (limited permissions)
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
@@ -156,6 +157,7 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
           commit-message: |
             Update binaries for ${{ steps.version.outputs.tag }}
 
