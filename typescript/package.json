@@ -1,6 +1,6 @@
 {
   "name": "libnextimage",
-  "version": "0.5.2",
+  "version": "0.5.4",
   "description": "TypeScript/Node.js bindings for libnextimage - high-performance WebP and AVIF image processing",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
