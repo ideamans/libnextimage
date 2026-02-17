@@ -1058,6 +1058,14 @@ func TestCompat_AVIF_Lossless(t *testing.T) {
 			args: []string{"-l", "-s", "0"},
 		},
 		{
+			name: "lossless-flag-with-speed-4",
+			optsFn: func(opts *AVIFEncodeOptions) {
+				opts.Lossless = true
+				opts.Speed = 4
+			},
+			args: []string{"-l", "-s", "4"},
+		},
+		{
 			name: "lossless-flag-with-speed-10",
 			optsFn: func(opts *AVIFEncodeOptions) {
 				opts.Lossless = true
@@ -1128,6 +1136,65 @@ func TestCompat_AVIF_LosslessAlpha(t *testing.T) {
 			compareAVIFOutputs(t, cmdOutput, libOutput)
 		})
 	}
+}
+
+// TestCompat_AVIF_LosslessFullCommand tests binary exact match against the full avifenc command:
+//   avifenc --lossless --yuv 444 --speed 4 --jobs all --ignore-exif --icc input.png output.avif
+//
+// Known limitations:
+// - 16-bit PNG: avifenc detects input depth and outputs 12-bit; our library uses libwebp imageio which only supports 8-bit
+// - Grayscale PNG (colorType=0): libwebp and libpng differ in grayscale-to-RGB expansion
+// These cases are explicitly skipped below.
+func TestCompat_AVIF_LosslessFullCommand(t *testing.T) {
+	setupAVIFCompatTest(t)
+
+	// avifenc args matching: --lossless --yuv 444 --speed 4 --jobs all --ignore-exif
+	// Note: --jobs all and --ignore-exif don't affect the encoded bitstream when input has no EXIF
+	// --icc is not specified as a flag here because these test PNGs don't embed ICC profiles
+	avifencArgs := []string{"--lossless", "--yuv", "444", "--speed", "4", "--jobs", "all", "--ignore-exif"}
+
+	// 8-bit RGB/RGBA/palette test images (expected: binary exact match)
+	inputFiles := []string{
+		filepath.Join(testdataDir, "source/sizes/small-128x128.png"),
+		filepath.Join(testdataDir, "source/sizes/medium-512x512.png"),
+		filepath.Join(testdataDir, "source/colors/solid-red.png"),
+		filepath.Join(testdataDir, "source/alpha/alpha-circle.png"),
+		filepath.Join(testdataDir, "source/alpha/opaque.png"),
+		filepath.Join(testdataDir, "source/compression/flat-color.png"),
+		filepath.Join(testdataDir, "source/avif-specific/8bit-rgb.png"),
+	}
+
+	for _, inputPath := range inputFiles {
+		baseName := filepath.Base(inputPath)
+		t.Run(baseName, func(t *testing.T) {
+			t.Logf("Testing full avifenc lossless command compatibility: %s", baseName)
+
+			// Run avifenc command
+			cmdOutput := runAVIFEnc(t, inputPath, avifencArgs)
+
+			// Run library encoding with equivalent settings
+			opts := DefaultAVIFEncodeOptions()
+			opts.Lossless = true
+			opts.Speed = 4
+			libOutput, err := encodeAVIFWithLibrary(inputPath, opts)
+			if err != nil {
+				t.Fatalf("library encoding failed: %v", err)
+			}
+
+			// Compare outputs - expect binary exact match
+			compareAVIFOutputs(t, cmdOutput, libOutput)
+		})
+	}
+
+	// 16-bit PNG: skip with documented reason
+	t.Run("16bit-png-skip", func(t *testing.T) {
+		t.Skip("16-bit PNG: avifenc detects input depth and outputs 12-bit; library uses libwebp imageio (8-bit only)")
+	})
+
+	// Grayscale PNG: skip with documented reason
+	t.Run("grayscale-png-skip", func(t *testing.T) {
+		t.Skip("Grayscale PNG (colorType=0): libwebp and libpng differ in grayscale-to-RGB expansion")
+	})
 }
 
 // TestCompat_AVIF_PremultiplyAlpha tests AVIF encoding with premultiply alpha
