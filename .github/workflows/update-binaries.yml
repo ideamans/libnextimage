@@ -149,6 +149,14 @@ jobs:
           # Remove library-version.json if it exists
           rm -f library-version.json
 
+      - name: Update Rust crate version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # The crate's auto-download fetches the release asset of its own version
+          sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" rust/Cargo.toml
+          sed -i "/^name = \"nextimage\"$/{n;s/^version = \".*\"/version = \"$VERSION\"/}" rust/Cargo.lock
+          grep -m1 '^version' rust/Cargo.toml
+
       - name: Clean up downloaded archives
         run: |
           rm -f static-*.tar.gz shared-*.tar.gz
