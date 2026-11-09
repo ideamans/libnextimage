@@ -27,6 +27,14 @@ The package automatically downloads the appropriate pre-built native library for
 - Linux (ARM64 and x64)
 - Windows (x64)
 
+On Linux the native library links against the system libjpeg, libpng and giflib.
+Install them if they are missing (otherwise loading fails with `libgif.so.7: cannot open shared object file`):
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y libgif7 libjpeg-turbo8 libpng16-16
+```
+
 ## Quick Start
 
 ### WebP Encoding

@@ -27,6 +27,14 @@ npm install libnextimage
 - Linux (ARM64 および x64)
 - Windows (x64)
 
+Linux では、ネイティブライブラリがシステムの libjpeg・libpng・giflib にリンクしています。
+入っていなければ入れてください（無いと `libgif.so.7: cannot open shared object file` で読み込みに失敗します）。
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y libgif7 libjpeg-turbo8 libpng16-16
+```
+
 ## クイックスタート
 
 ### WebPエンコード

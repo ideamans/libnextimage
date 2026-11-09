@@ -356,7 +356,8 @@ TypeScriptがコンパイルされると、`dist/library.js`内の`__dirname`は
   ],
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build && npm run build:test && node test/run.mjs",
     "postinstall": "node scripts/download-library.js",
     "prepublishOnly": "npm run build"
   },
@@ -1070,7 +1071,8 @@ typescript/test/
 npm test
 
 # 出力:
-#   dist/test/*.test.js      - コンパイル済みテスト
+#   dist-test/test/*.test.js - コンパイル済みテスト（tsconfig.test.json。公開物の dist/ とは分ける）
+#   テストが1件も走らなければ test/run.mjs が失敗にする
 #   test-output/*.webp       - 目視確認用の生成画像
 ```
 
