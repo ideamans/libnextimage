@@ -160,6 +160,9 @@ jobs:
     needs: build-matrix
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      actions: write
     
     steps:
       - name: Checkout code
@@ -181,7 +184,12 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release created with GITHUB_TOKEN does not fire the `release` event,
+      # so start update-binaries explicitly (workflow_dispatch is allowed with GITHUB_TOKEN).
+      # This used to rely on a PAT (PAT_TOKEN), which expired and broke v0.5.5.
+      - name: Start update-binaries
         env:
-          # Use PAT_TOKEN to trigger the update-binaries workflow
-          # GITHUB_TOKEN cannot trigger other workflows due to GitHub Actions security
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run update-binaries.yml -R "${{ github.repository }}" --ref main -f tag="${{ github.ref_name }}"

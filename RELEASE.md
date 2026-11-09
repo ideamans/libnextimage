@@ -45,7 +45,14 @@ When you push a `v*` tag, the `release.yml` workflow automatically:
 
 ### 3. Automated Binary Update
 
-The `update-binaries.yml` workflow is triggered automatically when a release is published:
+`release.yml` starts the `update-binaries.yml` workflow (workflow_dispatch) right after it creates the release.
+Both workflows use `GITHUB_TOKEN` only (no PAT). If the release was created by hand, start it with
+`gh workflow run update-binaries.yml -f tag=v0.5.0`.
+
+**The PR it opens is created with `GITHUB_TOKEN`, so CI does not run on it.** Check out the PR branch and run the
+Go and TypeScript tests locally (or push an empty commit from your account) before merging.
+
+The workflow:
 
 - Downloads all platform binaries from the Release
 - Organizes them into the project structure:
