@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -116,7 +116,7 @@ jobs:
           bash scripts/generate-test-images.sh
 
       - name: Cache C library artifacts
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v5
         with:
           path: |
             lib/
@@ -191,14 +191,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Restore C library cache
         if: needs.build-c-library.result == 'success'
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v5
         with:
           path: |
             lib/
@@ -208,7 +208,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
           go-version: '1.21'
           cache: true
@@ -261,7 +261,7 @@ jobs:
           go test -v .
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         if: matrix.os == 'ubuntu-latest'
         with:
           files: golang/coverage.out
@@ -292,14 +292,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Restore C library cache
         if: needs.build-c-library.result == 'success'
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v5
         with:
           path: |
             lib/
@@ -315,7 +315,7 @@ jobs:
           sudo apt-get install -y libgif7 libjpeg-turbo8 libpng16-16
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
