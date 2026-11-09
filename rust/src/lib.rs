@@ -78,7 +78,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 /// Library version
-pub const VERSION: &str = "0.5.0";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Supported platforms for pre-built libraries
 pub const PLATFORMS: &[&str] = &[
@@ -211,6 +211,9 @@ pub fn ensure_library() -> Result<()> {
 }
 
 /// Download the native library from GitHub Releases.
+///
+/// The release asset `libnextimage-v<version>-<platform>.tar.gz` contains `lib/libnextimage.a`
+/// and `include/`. They are placed in `<cache>/lib/<platform>/`, where `build.rs` looks for them.
 #[cfg(feature = "auto-download")]
 fn download_library(cache_dir: &PathBuf) -> Result<()> {
     use flate2::read::GzDecoder;
@@ -219,7 +222,7 @@ fn download_library(cache_dir: &PathBuf) -> Result<()> {
 
     let platform = get_platform();
     let url = format!(
-        "https://github.com/ideamans/libnextimage/releases/download/v{}/libnextimage-{}.tar.gz",
+        "https://github.com/ideamans/libnextimage/releases/download/v{0}/libnextimage-v{0}-{1}.tar.gz",
         VERSION, platform
     );
 
@@ -227,25 +230,44 @@ fn download_library(cache_dir: &PathBuf) -> Result<()> {
         eprintln!("Downloading libnextimage from {}...", url);
     }
 
-    // Create cache directory
-    std::fs::create_dir_all(cache_dir)?;
-
     // Download
     let response = ureq::get(&url)
         .call()
-        .map_err(|e| Error::DownloadFailed(e.to_string()))?;
+        .map_err(|e| Error::DownloadFailed(format!("{}: {}", url, e)))?;
 
     let mut reader = response.into_reader();
     let mut data = Vec::new();
     reader.read_to_end(&mut data)?;
 
-    // Extract
-    let decoder = GzDecoder::new(&data[..]);
-    let mut archive = Archive::new(decoder);
-    archive.unpack(cache_dir)?;
+    // Extract into a temporary directory, then move the library into lib/<platform>/
+    let dest = get_library_path(cache_dir)
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or_else(|| Error::DownloadFailed("invalid cache directory".to_string()))?;
+    let tmp = dest.with_extension("download");
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp)?;
+    Archive::new(GzDecoder::new(&data[..])).unpack(&tmp)?;
+
+    let lib = tmp.join("lib").join("libnextimage.a");
+    if !lib.exists() {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(Error::DownloadFailed(format!(
+            "{} does not contain lib/libnextimage.a",
+            url
+        )));
+    }
+    std::fs::create_dir_all(&dest)?;
+    std::fs::copy(&lib, dest.join("libnextimage.a"))?;
+    let include = tmp.join("include");
+    if include.exists() {
+        let _ = std::fs::remove_dir_all(dest.join("include"));
+        std::fs::rename(&include, dest.join("include"))?;
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
 
     if is_verbose() {
-        eprintln!("Library installed to {:?}", cache_dir);
+        eprintln!("Library installed to {:?}", dest);
     }
 
     Ok(())

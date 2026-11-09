@@ -170,11 +170,18 @@ The native library can be installed in several ways:
 
 ### 1. Automatic Download (Recommended)
 
-Enable the `auto-download` feature and call `ensure_library()` at startup:
+Enable the `auto-download` feature. When `libnextimage.a` is not found, the build script downloads
+`libnextimage-v<crate version>-<platform>.tar.gz` from GitHub Releases into the cache directory
+(`<cache>/lib/<platform>/`) and links it. The static library is needed at link time, so the download
+happens during `cargo build`, not when your program runs.
+
+`ensure_library()` checks that the library is in place (and downloads it into the cache if it is not):
 
 ```rust
 nextimage::ensure_library()?;
 ```
+
+The crate version must match a release tag (`v<crate version>`) that has the prebuilt archives.
 
 ### 2. Environment Variable
 

@@ -39,10 +39,24 @@ fn main() {
     search_paths.push(manifest_dir.join("lib").join(&platform));
 
     // Find the library
-    let lib_path = search_paths
+    #[allow(unused_mut)]
+    let mut lib_path = search_paths
         .iter()
         .find(|path| path.join("libnextimage.a").exists())
         .cloned();
+
+    // 4. Download the prebuilt library from GitHub Releases (auto-download feature).
+    //    The static library is needed at link time, so this has to happen here, not at runtime.
+    #[cfg(feature = "auto-download")]
+    if lib_path.is_none() {
+        if let Some(cache_dir) = get_cache_dir() {
+            let dest = cache_dir.join("lib").join(&platform);
+            match download_library(&platform, &dest) {
+                Ok(()) => lib_path = Some(dest),
+                Err(e) => println!("cargo:warning=failed to download libnextimage: {}", e),
+            }
+        }
+    }
 
     if let Some(lib_dir) = lib_path {
         println!("cargo:rustc-link-search=native={}", lib_dir.display());
@@ -82,6 +96,56 @@ fn main() {
     // Rerun if environment changes
     println!("cargo:rerun-if-env-changed=LIBNEXTIMAGE_LIB_DIR");
     println!("cargo:rerun-if-env-changed=LIBNEXTIMAGE_CACHE_DIR");
+}
+
+/// Release asset URL for the static library of this crate's version.
+/// The asset is `libnextimage-v<version>-<platform>.tar.gz` and contains `lib/libnextimage.a` and `include/`.
+#[cfg(feature = "auto-download")]
+fn download_url(platform: &str) -> String {
+    let version = env::var("CARGO_PKG_VERSION").unwrap();
+    format!(
+        "https://github.com/ideamans/libnextimage/releases/download/v{0}/libnextimage-v{0}-{1}.tar.gz",
+        version, platform
+    )
+}
+
+/// Download the release asset and place `libnextimage.a` (and the headers) in `dest`.
+#[cfg(feature = "auto-download")]
+fn download_library(platform: &str, dest: &std::path::Path) -> Result<(), String> {
+    use std::io::Read;
+
+    let url = download_url(platform);
+    let response = ureq::get(&url)
+        .call()
+        .map_err(|e| format!("{}: {}", url, e))?;
+    let mut data = Vec::new();
+    response
+        .into_reader()
+        .read_to_end(&mut data)
+        .map_err(|e| format!("{}: {}", url, e))?;
+
+    // Unpack into a temporary directory next to dest, then move only what we need.
+    let tmp = dest.with_extension("download");
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+    tar::Archive::new(flate2::read::GzDecoder::new(&data[..]))
+        .unpack(&tmp)
+        .map_err(|e| format!("unpack {}: {}", url, e))?;
+
+    let lib = tmp.join("lib").join("libnextimage.a");
+    if !lib.exists() {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(format!("{} does not contain lib/libnextimage.a", url));
+    }
+    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+    std::fs::copy(&lib, dest.join("libnextimage.a")).map_err(|e| e.to_string())?;
+    let include = tmp.join("include");
+    if include.exists() {
+        let _ = std::fs::remove_dir_all(dest.join("include"));
+        std::fs::rename(&include, dest.join("include")).map_err(|e| e.to_string())?;
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+    Ok(())
 }
 
 fn get_cache_dir() -> Option<PathBuf> {
