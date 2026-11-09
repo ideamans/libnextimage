@@ -10,7 +10,7 @@ The release process is automated using GitHub Actions and follows this flow:
 2. **Build Binaries** - CI builds all platforms and creates GitHub Release
 3. **Update Modules** - Automated PR adds binaries to Go/TypeScript modules
 4. **Merge PR** - Review and merge the automated PR
-5. **Publish** - Tag Go modules and publish TypeScript to npm
+5. **Publish** - Tag Go modules, and push a `typescript/v*` tag to publish TypeScript to npm (CI)
 
 ## Detailed Steps
 
@@ -121,24 +121,26 @@ git push --tags
 
 ### 6. Publish TypeScript to npm
 
+After the binaries PR is merged (it sets `typescript/package.json` to the new version and adds `typescript/lib/`),
+push a `typescript/v*` tag. `.github/workflows/publish.yml` tests and publishes with npm **Trusted Publishing**
+(GitHub Actions OIDC). No npm token is used and nobody runs `npm publish` locally.
+
 ```bash
-cd typescript
-
-# Verify package.json version is correct
-cat package.json | grep version
-
-# Build
-npm run build
-
-# Login to npm (if not already)
-npm login
-
-# Publish
-npm publish
+git checkout main && git pull
+git tag typescript/v0.5.0
+git push origin typescript/v0.5.0
 
 # Verify
 npm view libnextimage version
 ```
+
+The job fails if the tag differs from `typescript/package.json`, and does nothing if the version is already on npm.
+The plain `v*` tag cannot be used for this: at that point the binaries and the version bump are not on `main` yet.
+To publish without a tag (e.g. a version that was merged but never released), start "Publish to npm" with
+workflow_dispatch on `main`.
+
+Prerequisite: on npmjs.com, `libnextimage` lists GitHub Actions / `ideamans/libnextimage` / `publish.yml` with the
+**publish** permission as its Trusted Publisher.
 
 ## Manual Workflow Trigger
 
@@ -156,7 +158,7 @@ gh workflow run update-binaries.yml -f tag=v0.5.0
 
 - **Main library**: `v0.5.0`
 - **Go modules**: `golang/v0.5.0`, `golang/cwebp/v0.5.0`, etc.
-- **TypeScript**: `0.5.0` (no `v` prefix for npm)
+- **TypeScript**: `0.5.0` on npm, released by the `typescript/v0.5.0` tag
 
 ## Platform Support
 
