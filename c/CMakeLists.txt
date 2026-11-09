@@ -385,8 +385,16 @@ install(CODE "
         \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libwebpmux.a\"
         \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libsharpyuv.a\"
         \"${CMAKE_CURRENT_BINARY_DIR}/libavif/libavif_internal.a\"
-        \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\"
     )
+
+    # libaom のビルド先は libavif の版で違う（1.3 まで _deps/aom-build、1.4 から _deps/libaom-build）
+    if(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/_deps/libaom-build/libaom.a\")
+        list(APPEND LIBS_TO_COMBINE \"${CMAKE_CURRENT_BINARY_DIR}/_deps/libaom-build/libaom.a\")
+    elseif(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\")
+        list(APPEND LIBS_TO_COMBINE \"${CMAKE_CURRENT_BINARY_DIR}/_deps/aom-build/libaom.a\")
+    else()
+        message(FATAL_ERROR \"libaom.a not found under ${CMAKE_CURRENT_BINARY_DIR}/_deps\")
+    endif()
 
     # Add optional libraries if they exist (imagedec/enc/ioutil may not exist without giflib)
     if(EXISTS \"${CMAKE_CURRENT_BINARY_DIR}/libwebp/libimagedec.a\")
