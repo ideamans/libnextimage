@@ -9,7 +9,9 @@
 #   git tag typescript/vX.Y.Z && git push origin typescript/vX.Y.Z
 # 既に npm にある版なら何もしない。タグを打ち直さずに出し直すときは workflow_dispatch で
 # 対象のブランチを選んで起動する（package.json の版を公開する）。
-# PR では、このファイルを変えたときだけ公開せずに中身（npm pack --dry-run）を確かめる。
+# PR では、このファイルかテストの組み立て（package.json・tsconfig・test/run.mjs）を変えたときだけ、
+# 公開せずにテストと中身（npm pack --dry-run）を確かめる。
+# npm test はテストが1件も走らなければ失敗する（test/run.mjs）。以前は 0 件のまま成功していた。
 name: Publish to npm
 
 on:
@@ -20,6 +22,9 @@ on:
   pull_request:
     paths:
       - .github/workflows/publish.yml
+      - typescript/package.json
+      - typescript/tsconfig*.json
+      - typescript/test/run.mjs
 
 permissions:
   contents: read
