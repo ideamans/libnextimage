@@ -39,11 +39,11 @@
     "directory": "typescript"
   },
   "dependencies": {
-    "koffi": "^2.9.0"
+    "koffi": "^3.3.7"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   },
   "files": [
     "dist",
